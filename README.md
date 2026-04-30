@@ -1,18 +1,26 @@
 # pywv
 
-**pywv** is a Python-based tool for parsing, analyzing, and interacting with **Widevine (WVD) device files** and associated DRM structures. It provides low-level access to device data, cryptographic components, and license-related metadata, enabling precise inspection and controlled handling of Widevine workflows.
+**pywv** is a Python-based tool for parsing, analyzing, and interacting with **Widevine (WVD) device files** and DRM structures.
+It provides direct access to device data, cryptographic components, and license workflows for controlled inspection and processing.
 
 ---
 
 ## Features
 
-* Parsing and loading of **Widevine Device (WVD) files** 
-* Support for **WVD version migration (v1 → v2)** 
-* Extraction of **device attributes** (system ID, security level, client identification) 
-* Decoding of **Widevine protobuf structures** (ClientIdentification, certificates, licenses) 
-* Integration with **cryptographic primitives** (RSA, AES, CMAC, HMAC) 
-* Parsing and manipulation of **PSSH (Widevine / PlayReady)** containers 
-* License processing and **content key extraction** via CDM workflows 
+* Parsing and loading of **Widevine Device (WVD) files**
+* Support for **WVD version migration (v1 → v2)**
+* Device loading from:
+
+  * `.wvd` files
+  * key + client_id blobs
+  * device directories
+* Extraction of **device attributes** (system ID, security level)
+* Decoding of **Widevine protobuf structures**
+* Integration with **cryptographic primitives** (RSA, AES, CMAC, HMAC)
+* Parsing and manipulation of **Widevine PSSH**
+* License processing and **content key extraction**
+* Optional **VMP (Verified Media Path) support**
+* Built-in CDM logic (no external binaries required)
 
 ---
 
@@ -36,11 +44,127 @@ pip install pycryptodome construct protobuf pymp4 requests
 ## Usage
 
 ```bash
-python pywv.py [options]
+python pywv.py <command> [options]
 ```
+
 ---
 
-## Examples
+## Commands
+
+### info
+
+Inspect a device:
+
+```bash
+python pywv.py info --wvd device.wvd
+```
+
+Alternative input modes:
+
+```bash
+python pywv.py info --device-dir path/
+python pywv.py info --key device_private_key --client-id device_client_id_blob
+```
+
+Optional:
+
+```bash
+--vmp device_vmp_blob
+```
+
+---
+
+### license
+
+Execute the full license workflow (challenge generation, request submission, response parsing, key extraction):
+
+```bash
+python pywv.py license \
+  --wvd device.wvd \
+  --pssh BASE64_PSSH \
+  --url LICENSE_URL
+```
+
+Using raw blobs:
+
+```bash
+python pywv.py license \
+  --key device_private_key \
+  --client-id device_client_id_blob \
+  --pssh BASE64_PSSH \
+  --url LICENSE_URL
+```
+
+Challenge-only mode:
+
+```bash
+python pywv.py license \
+  --wvd device.wvd \
+  --pssh BASE64_PSSH
+```
+
+---
+
+### create-wvd
+
+Create a WVD file from raw device components:
+
+```bash
+python pywv.py create-wvd \
+  --key device_private_key \
+  --client-id device_client_id_blob \
+  -o device.wvd
+```
+
+With VMP:
+
+```bash
+--vmp device_vmp_blob
+```
+
+---
+
+### export-wvd
+
+Export a WVD file into raw device components:
+
+```bash
+python pywv.py export-wvd \
+  --wvd device.wvd \
+  -o output_dir
+```
+
+---
+
+### migrate-wvd
+
+Migrate a WVD v1 file to WVD v2:
+
+```bash
+python pywv.py migrate-wvd \
+  -i old.wvd \
+  -o new.wvd
+```
+
+---
+
+### pssh
+
+Inspect PSSH data:
+
+```bash
+python pywv.py pssh --pssh BASE64_PSSH
+```
+
+Rewrite key IDs:
+
+```bash
+python pywv.py pssh --pssh BASE64_PSSH --set-kid NEW_KID
+```
+
+---
+
+## Python Usage
 
 ### Basic Usage
 
@@ -50,20 +174,21 @@ from pywv import PSSH, Device, Cdm
 
 pssh = PSSH("AAAAW3Bzc2gAAAAA7e+LqXnWSs6jyCfc1R0h7QAAADsIARIQ62dqu8s0Xpa7z2FmMPGj2hoNd2lkZXZpbmVfdGVzdCIQZmtqM2xqYVNkZmFsa3IzaioCSEQyAA==")
 
-device = Device.load("xiaomi_redmi_note_4x_15.0.0_e15a9e5f_8159_l3.wvd")
+device = Device.load("device.wvd")
+
 cdm = Cdm.from_device(device)
 session_id = cdm.open()
 
 try:
     challenge = cdm.get_license_challenge(session_id, pssh)
 
-    license_response = requests.post(
+    response = requests.post(
         "https://cwip-shaka-proxy.appspot.com/no_auth",
         data=challenge,
     )
-    license_response.raise_for_status()
+    response.raise_for_status()
 
-    cdm.parse_license(session_id, license_response.content)
+    cdm.parse_license(session_id, response.content)
 
     for key in cdm.get_keys(session_id):
         print(f"[{key.type}] {key.kid.hex}:{key.key.hex()}")
@@ -74,44 +199,22 @@ finally:
 
 ---
 
-### Using JSON Device Configuration
+### Using Key / Certificate (no JSON)
 
 ```python
-# wv.json example:
-# {
-#   "security_level": 3,
-#   "session_id_type": "android",
-#   "private_key_available": true,
-#   "vmp": false
-# }
-
-import json
 import requests
 from pathlib import Path
 from pywv import PSSH, Device, Cdm
 
-base_path = Path(__file__).resolve().parent
-
-with open(base_path / "wv.json", "r", encoding="utf-8") as f:
-    wv = json.load(f)
+base = Path(__file__).resolve().parent
 
 pssh = PSSH("AAAAW3Bzc2gAAAAA7e+LqXnWSs6jyCfc1R0h7QAAADsIARIQ62dqu8s0Xpa7z2FmMPGj2hoNd2lkZXZpbmVfdGVzdCIQZmtqM2xqYVNkZmFsa3IzaioCSEQyAA==")
 
-if not wv.get("private_key_available", True):
-    raise ValueError("This device profile does not include a private key")
-
-device_kwargs = {
-    "private_key": base_path / "device_private_key",
-    "client_id": base_path / "device_client_id_blob",
-    "type_": wv.get("session_id_type", "ANDROID").upper(),
-    "security_level": wv.get("security_level", 3),
-}
-
-vmp_path = base_path / "device_vmp_blob"
-if wv.get("vmp", False) and vmp_path.exists():
-    device_kwargs["vmp"] = vmp_path
-
-device = Device.from_files(**device_kwargs)
+device = Device.from_files(
+    certificate=base / "device_client_id_blob",
+    key=base / "device_private_key",
+    vmp=False
+)
 
 cdm = Cdm.from_device(device)
 session_id = cdm.open()
@@ -119,19 +222,102 @@ session_id = cdm.open()
 try:
     challenge = cdm.get_license_challenge(session_id, pssh)
 
-    license_response = requests.post(
+    response = requests.post(
         "https://cwip-shaka-proxy.appspot.com/no_auth",
         data=challenge,
     )
-    license_response.raise_for_status()
+    response.raise_for_status()
 
-    cdm.parse_license(session_id, license_response.content)
+    cdm.parse_license(session_id, response.content)
 
     for key in cdm.get_keys(session_id):
         print(f"[{key.type}] {key.kid.hex}:{key.key.hex()}")
 
 finally:
     cdm.close(session_id)
+```
+
+### Create WVD
+
+```python
+from pywv import Device
+
+device = Device.from_files(
+    certificate="device_client_id_blob",
+    key="device_private_key",
+    vmp=False
+)
+
+device.dump("device.wvd")
+```
+
+---
+
+### Export WVD
+
+```python
+from pathlib import Path
+from pywv import Device
+
+out = Path("exported")
+out.mkdir(exist_ok=True)
+
+device = Device.load("device.wvd")
+
+(out / "device_private_key").write_bytes(
+    device.private_key.export_key("DER")
+)
+
+(out / "device_client_id_blob").write_bytes(
+    device.client_id.SerializeToString()
+)
+
+if device.client_id.vmp_data:
+    (out / "device_vmp_blob").write_bytes(
+        device.client_id.vmp_data
+    )
+```
+
+---
+
+### Migrate WVD v1 → v2
+
+```python
+from pywv import Device
+
+with open("old.wvd", "rb") as f:
+    data = f.read()
+
+device = Device.migrate(data)
+device.dump("new.wvd")
+```
+
+---
+
+### PSSH
+
+```python
+from pywv import PSSH
+
+pssh = PSSH("BASE64")
+
+print(pssh.key_ids)
+
+new_pssh = PSSH.new(
+    system_id=PSSH.SystemId.Widevine,
+    key_ids=pssh.key_ids,
+    version=1
+)
+
+print(new_pssh.dumps())
+```
+
+---
+
+## Output
+
+```
+[CONTENT] kid:key
 ```
 
 ---
@@ -139,7 +325,7 @@ finally:
 ## Disclaimer
 
 This tool is intended strictly for **educational, research, and interoperability purposes**.
-The author does not support or encourage the misuse of DRM systems or unauthorized access to protected content.
+The author does not support or encourage misuse of DRM systems or unauthorized access to protected content.
 
 ---
 
@@ -147,10 +333,8 @@ The author does not support or encourage the misuse of DRM systems or unauthoriz
 
 For bug reports, feature requests, or general inquiries, please open an issue in the repository.
 
-Support and updates will be provided as availability permits.
-
 ---
 
 ## Acknowledgements
 
-This project is **based on pywidevine**, with modifications and restructuring to support standalone usage and extended functionality for working with WVD and PSSH data.
+This project is based on **pywidevine**, adapted for standalone usage and improved WVD and PSSH workflows.
