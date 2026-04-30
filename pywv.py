@@ -1,4 +1,3 @@
-
 from __future__ import annotations
 import argparse
 import base64
@@ -15,12 +14,10 @@ import sys
 import time
 from datetime import datetime
 from enum import Enum
-from io import BytesIO
 from pathlib import Path
 from typing import Any, Optional, Union
 from uuid import UUID
 from zlib import crc32
-from xml.etree.ElementTree import XML
 import requests
 from construct import BitStruct, Bytes, Const, ConstructError, Container
 from construct import Enum as CEnum
@@ -55,7 +52,7 @@ from google.protobuf.internal import builder as _builder
                                    
 _sym_db = _symbol_database.Default()
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x16license_protocol.proto\x12\x10license_protocol\"\xb2\x01\n\x15LicenseIdentification\x12\x12\n\nrequest_id\x18\x01 \x01(\x0c\x12\x12\n\nsession_id\x18\x02 \x01(\x0c\x12\x13\n\x0bpurchase_id\x18\x03 \x01(\x0c\x12+\n\x04type\x18\x04 \x01(\x0e\x32\x1d.license_protocol.LicenseType\x12\x0f\n\x07version\x18\x05 \x01(\x05\x12\x1e\n\x16provider_session_token\x18\x06 \x01(\x0c\"\xcc\x17\n\x07License\x12\x33\n\x02id\x18\x01 \x01(\x0b\x32\'.license_protocol.LicenseIdentification\x12\x30\n\x06policy\x18\x02 \x01(\x0b\x32 .license_protocol.License.Policy\x12\x33\n\x03key\x18\x03 \x03(\x0b\x32&.license_protocol.License.KeyContainer\x12\x1a\n\x12license_start_time\x18\x04 \x01(\x03\x12*\n\x1bremote_attestation_verified\x18\x05 \x01(\x08:\x05\x66\x61lse\x12\x1d\n\x15provider_client_token\x18\x06 \x01(\x0c\x12\x19\n\x11protection_scheme\x18\x07 \x01(\r\x12\x17\n\x0fsrm_requirement\x18\x08 \x01(\x0c\x12\x12\n\nsrm_update\x18\t \x01(\x0c\x12l\n\x1cplatform_verification_status\x18\n \x01(\x0e\x32,.license_protocol.PlatformVerificationStatus:\x18PLATFORM_NO_VERIFICATION\x12\x11\n\tgroup_ids\x18\x0b \x03(\x0c\x1a\xae\x04\n\x06Policy\x12\x17\n\x08\x63\x61n_play\x18\x01 \x01(\x08:\x05\x66\x61lse\x12\x1a\n\x0b\x63\x61n_persist\x18\x02 \x01(\x08:\x05\x66\x61lse\x12\x18\n\tcan_renew\x18\x03 \x01(\x08:\x05\x66\x61lse\x12\"\n\x17rental_duration_seconds\x18\x04 \x01(\x03:\x01\x30\x12$\n\x19playback_duration_seconds\x18\x05 \x01(\x03:\x01\x30\x12#\n\x18license_duration_seconds\x18\x06 \x01(\x03:\x01\x30\x12,\n!renewal_recovery_duration_seconds\x18\x07 \x01(\x03:\x01\x30\x12\x1a\n\x12renewal_server_url\x18\x08 \x01(\t\x12 \n\x15renewal_delay_seconds\x18\t \x01(\x03:\x01\x30\x12)\n\x1erenewal_retry_interval_seconds\x18\n \x01(\x03:\x01\x30\x12\x1f\n\x10renew_with_usage\x18\x0b \x01(\x08:\x05\x66\x61lse\x12\'\n\x18\x61lways_include_client_id\x18\x0c \x01(\x08:\x05\x66\x61lse\x12*\n\x1fplay_start_grace_period_seconds\x18\r \x01(\x03:\x01\x30\x12-\n\x1esoft_enforce_playback_duration\x18\x0e \x01(\x08:\x05\x66\x61lse\x12*\n\x1csoft_enforce_rental_duration\x18\x0f \x01(\x08:\x04true\x1a\xc3\x0f\n\x0cKeyContainer\x12\n\n\x02id\x18\x01 \x01(\x0c\x12\n\n\x02iv\x18\x02 \x01(\x0c\x12\x0b\n\x03key\x18\x03 \x01(\x0c\x12<\n\x04type\x18\x04 \x01(\x0e\x32..license_protocol.License.KeyContainer.KeyType\x12U\n\x05level\x18\x05 \x01(\x0e\x32\x34.license_protocol.License.KeyContainer.SecurityLevel:\x10SW_SECURE_CRYPTO\x12T\n\x13required_protection\x18\x06 \x01(\x0b\x32\x37.license_protocol.License.KeyContainer.OutputProtection\x12U\n\x14requested_protection\x18\x07 \x01(\x0b\x32\x37.license_protocol.License.KeyContainer.OutputProtection\x12\x46\n\x0bkey_control\x18\x08 \x01(\x0b\x32\x31.license_protocol.License.KeyContainer.KeyControl\x12n\n operator_session_key_permissions\x18\t \x01(\x0b\x32\x44.license_protocol.License.KeyContainer.OperatorSessionKeyPermissions\x12\x66\n\x1cvideo_resolution_constraints\x18\n \x03(\x0b\x32@.license_protocol.License.KeyContainer.VideoResolutionConstraint\x12(\n\x19\x61nti_rollback_usage_table\x18\x0b \x01(\x08:\x05\x66\x61lse\x12\x13\n\x0btrack_label\x18\x0c \x01(\t\x1a\x33\n\nKeyControl\x12\x19\n\x11key_control_block\x18\x01 \x01(\x0c\x12\n\n\x02iv\x18\x02 \x01(\x0c\x1a\xfb\x04\n\x10OutputProtection\x12U\n\x04hdcp\x18\x01 \x01(\x0e\x32<.license_protocol.License.KeyContainer.OutputProtection.HDCP:\tHDCP_NONE\x12[\n\ncgms_flags\x18\x02 \x01(\x0e\x32<.license_protocol.License.KeyContainer.OutputProtection.CGMS:\tCGMS_NONE\x12n\n\rhdcp_srm_rule\x18\x03 \x01(\x0e\x32\x43.license_protocol.License.KeyContainer.OutputProtection.HdcpSrmRule:\x12HDCP_SRM_RULE_NONE\x12$\n\x15\x64isable_analog_output\x18\x04 \x01(\x08:\x05\x66\x61lse\x12%\n\x16\x64isable_digital_output\x18\x05 \x01(\x08:\x05\x66\x61lse\"y\n\x04HDCP\x12\r\n\tHDCP_NONE\x10\x00\x12\x0b\n\x07HDCP_V1\x10\x01\x12\x0b\n\x07HDCP_V2\x10\x02\x12\r\n\tHDCP_V2_1\x10\x03\x12\r\n\tHDCP_V2_2\x10\x04\x12\r\n\tHDCP_V2_3\x10\x05\x12\x1b\n\x16HDCP_NO_DIGITAL_OUTPUT\x10\xff\x01\"C\n\x04\x43GMS\x12\r\n\tCGMS_NONE\x10*\x12\r\n\tCOPY_FREE\x10\x00\x12\r\n\tCOPY_ONCE\x10\x02\x12\x0e\n\nCOPY_NEVER\x10\x03\"6\n\x0bHdcpSrmRule\x12\x16\n\x12HDCP_SRM_RULE_NONE\x10\x00\x12\x0f\n\x0b\x43URRENT_SRM\x10\x01\x1a\xaf\x01\n\x19VideoResolutionConstraint\x12\x1d\n\x15min_resolution_pixels\x18\x01 \x01(\r\x12\x1d\n\x15max_resolution_pixels\x18\x02 \x01(\r\x12T\n\x13required_protection\x18\x03 \x01(\x0b\x32\x37.license_protocol.License.KeyContainer.OutputProtection\x1a\x9d\x01\n\x1dOperatorSessionKeyPermissions\x12\x1c\n\rallow_encrypt\x18\x01 \x01(\x08:\x05\x66\x61lse\x12\x1c\n\rallow_decrypt\x18\x02 \x01(\x08:\x05\x66\x61lse\x12\x19\n\nallow_sign\x18\x03 \x01(\x08:\x05\x66\x61lse\x12%\n\x16\x61llow_signature_verify\x18\x04 \x01(\x08:\x05\x66\x61lse\"l\n\x07KeyType\x12\x0b\n\x07SIGNING\x10\x01\x12\x0b\n\x07\x43ONTENT\x10\x02\x12\x0f\n\x0bKEY_CONTROL\x10\x03\x12\x14\n\x10OPERATOR_SESSION\x10\x04\x12\x0f\n\x0b\x45NTITLEMENT\x10\x05\x12\x0f\n\x0bOEM_CONTENT\x10\x06\"z\n\rSecurityLevel\x12\x14\n\x10SW_SECURE_CRYPTO\x10\x01\x12\x14\n\x10SW_SECURE_DECODE\x10\x02\x12\x14\n\x10HW_SECURE_CRYPTO\x10\x03\x12\x14\n\x10HW_SECURE_DECODE\x10\x04\x12\x11\n\rHW_SECURE_ALL\x10\x05\"\xa3\x0c\n\x0eLicenseRequest\x12\x39\n\tclient_id\x18\x01 \x01(\x0b\x32&.license_protocol.ClientIdentification\x12J\n\ncontent_id\x18\x02 \x01(\x0b\x32\x36.license_protocol.LicenseRequest.ContentIdentification\x12:\n\x04type\x18\x03 \x01(\x0e\x32,.license_protocol.LicenseRequest.RequestType\x12\x14\n\x0crequest_time\x18\x04 \x01(\x03\x12$\n\x1ckey_control_nonce_deprecated\x18\x05 \x01(\x0c\x12H\n\x10protocol_version\x18\x06 \x01(\x0e\x32!.license_protocol.ProtocolVersion:\x0bVERSION_2_0\x12\x19\n\x11key_control_nonce\x18\x07 \x01(\r\x12L\n\x13\x65ncrypted_client_id\x18\x08 \x01(\x0b\x32/.license_protocol.EncryptedClientIdentification\x1a\xac\x08\n\x15\x43ontentIdentification\x12\x65\n\x12widevine_pssh_data\x18\x01 \x01(\x0b\x32G.license_protocol.LicenseRequest.ContentIdentification.WidevinePsshDataH\x00\x12W\n\x0bwebm_key_id\x18\x02 \x01(\x0b\x32@.license_protocol.LicenseRequest.ContentIdentification.WebmKeyIdH\x00\x12\x62\n\x10\x65xisting_license\x18\x03 \x01(\x0b\x32\x46.license_protocol.LicenseRequest.ContentIdentification.ExistingLicenseH\x00\x12T\n\tinit_data\x18\x04 \x01(\x0b\x32?.license_protocol.LicenseRequest.ContentIdentification.InitDataH\x00\x1an\n\x10WidevinePsshData\x12\x11\n\tpssh_data\x18\x01 \x03(\x0c\x12\x33\n\x0clicense_type\x18\x02 \x01(\x0e\x32\x1d.license_protocol.LicenseType\x12\x12\n\nrequest_id\x18\x03 \x01(\x0c\x1a\x64\n\tWebmKeyId\x12\x0e\n\x06header\x18\x01 \x01(\x0c\x12\x33\n\x0clicense_type\x18\x02 \x01(\x0e\x32\x1d.license_protocol.LicenseType\x12\x12\n\nrequest_id\x18\x03 \x01(\x0c\x1a\xb3\x01\n\x0f\x45xistingLicense\x12;\n\nlicense_id\x18\x01 \x01(\x0b\x32\'.license_protocol.LicenseIdentification\x12\x1d\n\x15seconds_since_started\x18\x02 \x01(\x03\x12!\n\x19seconds_since_last_played\x18\x03 \x01(\x03\x12!\n\x19session_usage_table_entry\x18\x04 \x01(\x0c\x1a\xf6\x01\n\x08InitData\x12j\n\x0einit_data_type\x18\x01 \x01(\x0e\x32L.license_protocol.LicenseRequest.ContentIdentification.InitData.InitDataType:\x04\x43\x45NC\x12\x11\n\tinit_data\x18\x02 \x01(\x0c\x12\x33\n\x0clicense_type\x18\x03 \x01(\x0e\x32\x1d.license_protocol.LicenseType\x12\x12\n\nrequest_id\x18\x04 \x01(\x0c\"\"\n\x0cInitDataType\x12\x08\n\x04\x43\x45NC\x10\x01\x12\x08\n\x04WEBM\x10\x02\x42\x14\n\x12\x63ontent_id_variant\"0\n\x0bRequestType\x12\x07\n\x03NEW\x10\x01\x12\x0b\n\x07RENEWAL\x10\x02\x12\x0b\n\x07RELEASE\x10\x03\"\xdd\x01\n\nMetricData\x12\x12\n\nstage_name\x18\x01 \x01(\t\x12;\n\x0bmetric_data\x18\x02 \x03(\x0b\x32&.license_protocol.MetricData.TypeValue\x1aT\n\tTypeValue\x12\x35\n\x04type\x18\x01 \x01(\x0e\x32\'.license_protocol.MetricData.MetricType\x12\x10\n\x05value\x18\x02 \x01(\x03:\x01\x30\"(\n\nMetricType\x12\x0b\n\x07LATENCY\x10\x01\x12\r\n\tTIMESTAMP\x10\x02\"K\n\x0bVersionInfo\x12\x1b\n\x13license_sdk_version\x18\x01 \x01(\t\x12\x1f\n\x17license_service_version\x18\x02 \x01(\t\"\xca\x05\n\rSignedMessage\x12\x39\n\x04type\x18\x01 \x01(\x0e\x32+.license_protocol.SignedMessage.MessageType\x12\x0b\n\x03msg\x18\x02 \x01(\x0c\x12\x11\n\tsignature\x18\x03 \x01(\x0c\x12\x13\n\x0bsession_key\x18\x04 \x01(\x0c\x12\x1a\n\x12remote_attestation\x18\x05 \x01(\x0c\x12\x31\n\x0bmetric_data\x18\x06 \x03(\x0b\x32\x1c.license_protocol.MetricData\x12;\n\x14service_version_info\x18\x07 \x01(\x0b\x32\x1d.license_protocol.VersionInfo\x12Y\n\x10session_key_type\x18\x08 \x01(\x0e\x32..license_protocol.SignedMessage.SessionKeyType:\x0fWRAPPED_AES_KEY\x12\x1e\n\x16oemcrypto_core_message\x18\t \x01(\x0c\"\xec\x01\n\x0bMessageType\x12\x13\n\x0fLICENSE_REQUEST\x10\x01\x12\x0b\n\x07LICENSE\x10\x02\x12\x12\n\x0e\x45RROR_RESPONSE\x10\x03\x12\x1f\n\x1bSERVICE_CERTIFICATE_REQUEST\x10\x04\x12\x17\n\x13SERVICE_CERTIFICATE\x10\x05\x12\x0f\n\x0bSUB_LICENSE\x10\x06\x12\x17\n\x13\x43\x41S_LICENSE_REQUEST\x10\x07\x12\x0f\n\x0b\x43\x41S_LICENSE\x10\x08\x12\x1c\n\x18\x45XTERNAL_LICENSE_REQUEST\x10\t\x12\x14\n\x10\x45XTERNAL_LICENSE\x10\n\"S\n\x0eSessionKeyType\x12\r\n\tUNDEFINED\x10\x00\x12\x13\n\x0fWRAPPED_AES_KEY\x10\x01\x12\x1d\n\x19\x45PHERMERAL_ECC_PUBLIC_KEY\x10\x02\"\xef\r\n\x14\x43lientIdentification\x12\x46\n\x04type\x18\x01 \x01(\x0e\x32\x30.license_protocol.ClientIdentification.TokenType:\x06KEYBOX\x12\r\n\x05token\x18\x02 \x01(\x0c\x12\x45\n\x0b\x63lient_info\x18\x03 \x03(\x0b\x32\x30.license_protocol.ClientIdentification.NameValue\x12\x1d\n\x15provider_client_token\x18\x04 \x01(\x0c\x12\x17\n\x0flicense_counter\x18\x05 \x01(\r\x12V\n\x13\x63lient_capabilities\x18\x06 \x01(\x0b\x32\x39.license_protocol.ClientIdentification.ClientCapabilities\x12\x10\n\x08vmp_data\x18\x07 \x01(\x0c\x12T\n\x12\x64\x65vice_credentials\x18\x08 \x03(\x0b\x32\x38.license_protocol.ClientIdentification.ClientCredentials\x1a(\n\tNameValue\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t\x1a\xb5\x08\n\x12\x43lientCapabilities\x12\x1b\n\x0c\x63lient_token\x18\x01 \x01(\x08:\x05\x66\x61lse\x12\x1c\n\rsession_token\x18\x02 \x01(\x08:\x05\x66\x61lse\x12+\n\x1cvideo_resolution_constraints\x18\x03 \x01(\x08:\x05\x66\x61lse\x12j\n\x10max_hdcp_version\x18\x04 \x01(\x0e\x32\x45.license_protocol.ClientIdentification.ClientCapabilities.HdcpVersion:\tHDCP_NONE\x12\x1e\n\x16oem_crypto_api_version\x18\x05 \x01(\r\x12(\n\x19\x61nti_rollback_usage_table\x18\x06 \x01(\x08:\x05\x66\x61lse\x12\x13\n\x0bsrm_version\x18\x07 \x01(\r\x12\x1d\n\x0e\x63\x61n_update_srm\x18\x08 \x01(\x08:\x05\x66\x61lse\x12t\n\x1esupported_certificate_key_type\x18\t \x03(\x0e\x32L.license_protocol.ClientIdentification.ClientCapabilities.CertificateKeyType\x12\x8d\x01\n\x1a\x61nalog_output_capabilities\x18\n \x01(\x0e\x32R.license_protocol.ClientIdentification.ClientCapabilities.AnalogOutputCapabilities:\x15\x41NALOG_OUTPUT_UNKNOWN\x12(\n\x19\x63\x61n_disable_analog_output\x18\x0b \x01(\x08:\x05\x66\x61lse\x12\x1f\n\x14resource_rating_tier\x18\x0c \x01(\r:\x01\x30\"\x80\x01\n\x0bHdcpVersion\x12\r\n\tHDCP_NONE\x10\x00\x12\x0b\n\x07HDCP_V1\x10\x01\x12\x0b\n\x07HDCP_V2\x10\x02\x12\r\n\tHDCP_V2_1\x10\x03\x12\r\n\tHDCP_V2_2\x10\x04\x12\r\n\tHDCP_V2_3\x10\x05\x12\x1b\n\x16HDCP_NO_DIGITAL_OUTPUT\x10\xff\x01\"i\n\x12\x43\x65rtificateKeyType\x12\x0c\n\x08RSA_2048\x10\x00\x12\x0c\n\x08RSA_3072\x10\x01\x12\x11\n\rECC_SECP256R1\x10\x02\x12\x11\n\rECC_SECP384R1\x10\x03\x12\x11\n\rECC_SECP521R1\x10\x04\"\x8d\x01\n\x18\x41nalogOutputCapabilities\x12\x19\n\x15\x41NALOG_OUTPUT_UNKNOWN\x10\x00\x12\x16\n\x12\x41NALOG_OUTPUT_NONE\x10\x01\x12\x1b\n\x17\x41NALOG_OUTPUT_SUPPORTED\x10\x02\x12!\n\x1d\x41NALOG_OUTPUT_SUPPORTS_CGMS_A\x10\x03\x1aj\n\x11\x43lientCredentials\x12\x46\n\x04type\x18\x01 \x01(\x0e\x32\x30.license_protocol.ClientIdentification.TokenType:\x06KEYBOX\x12\r\n\x05token\x18\x02 \x01(\x0c\"s\n\tTokenType\x12\n\n\x06KEYBOX\x10\x00\x12\x1a\n\x16\x44RM_DEVICE_CERTIFICATE\x10\x01\x12\"\n\x1eREMOTE_ATTESTATION_CERTIFICATE\x10\x02\x12\x1a\n\x16OEM_DEVICE_CERTIFICATE\x10\x03\"\xbb\x01\n\x1d\x45ncryptedClientIdentification\x12\x13\n\x0bprovider_id\x18\x01 \x01(\t\x12)\n!service_certificate_serial_number\x18\x02 \x01(\x0c\x12\x1b\n\x13\x65ncrypted_client_id\x18\x03 \x01(\x0c\x12\x1e\n\x16\x65ncrypted_client_id_iv\x18\x04 \x01(\x0c\x12\x1d\n\x15\x65ncrypted_privacy_key\x18\x05 \x01(\x0c\"\x83\x07\n\x0e\x44rmCertificate\x12\x33\n\x04type\x18\x01 \x01(\x0e\x32%.license_protocol.DrmCertificate.Type\x12\x15\n\rserial_number\x18\x02 \x01(\x0c\x12\x1d\n\x15\x63reation_time_seconds\x18\x03 \x01(\r\x12\x1f\n\x17\x65xpiration_time_seconds\x18\x0c \x01(\r\x12\x12\n\npublic_key\x18\x04 \x01(\x0c\x12\x11\n\tsystem_id\x18\x05 \x01(\r\x12\"\n\x16test_device_deprecated\x18\x06 \x01(\x08\x42\x02\x18\x01\x12\x13\n\x0bprovider_id\x18\x07 \x01(\t\x12\x43\n\rservice_types\x18\x08 \x03(\x0e\x32,.license_protocol.DrmCertificate.ServiceType\x12\x42\n\talgorithm\x18\t \x01(\x0e\x32*.license_protocol.DrmCertificate.Algorithm:\x03RSA\x12\x0e\n\x06rot_id\x18\n \x01(\x0c\x12\x46\n\x0e\x65ncryption_key\x18\x0b \x01(\x0b\x32..license_protocol.DrmCertificate.EncryptionKey\x1ag\n\rEncryptionKey\x12\x12\n\npublic_key\x18\x01 \x01(\x0c\x12\x42\n\talgorithm\x18\x02 \x01(\x0e\x32*.license_protocol.DrmCertificate.Algorithm:\x03RSA\"L\n\x04Type\x12\x08\n\x04ROOT\x10\x00\x12\x10\n\x0c\x44\x45VICE_MODEL\x10\x01\x12\n\n\x06\x44\x45VICE\x10\x02\x12\x0b\n\x07SERVICE\x10\x03\x12\x0f\n\x0bPROVISIONER\x10\x04\"\x86\x01\n\x0bServiceType\x12\x18\n\x14UNKNOWN_SERVICE_TYPE\x10\x00\x12\x16\n\x12LICENSE_SERVER_SDK\x10\x01\x12\x1c\n\x18LICENSE_SERVER_PROXY_SDK\x10\x02\x12\x14\n\x10PROVISIONING_SDK\x10\x03\x12\x11\n\rCAS_PROXY_SDK\x10\x04\"d\n\tAlgorithm\x12\x15\n\x11UNKNOWN_ALGORITHM\x10\x00\x12\x07\n\x03RSA\x10\x01\x12\x11\n\rECC_SECP256R1\x10\x02\x12\x11\n\rECC_SECP384R1\x10\x03\x12\x11\n\rECC_SECP521R1\x10\x04\"\xb8\x01\n\x14SignedDrmCertificate\x12\x17\n\x0f\x64rm_certificate\x18\x01 \x01(\x0c\x12\x11\n\tsignature\x18\x02 \x01(\x0c\x12\x36\n\x06signer\x18\x03 \x01(\x0b\x32&.license_protocol.SignedDrmCertificate\x12<\n\x0ehash_algorithm\x18\x04 \x01(\x0e\x32$.license_protocol.HashAlgorithmProto\"\xd5\x05\n\x10WidevinePsshData\x12\x0f\n\x07key_ids\x18\x02 \x03(\x0c\x12\x12\n\ncontent_id\x18\x04 \x01(\x0c\x12\x1b\n\x13\x63rypto_period_index\x18\x07 \x01(\r\x12\x19\n\x11protection_scheme\x18\t \x01(\r\x12\x1d\n\x15\x63rypto_period_seconds\x18\n \x01(\r\x12=\n\x04type\x18\x0b \x01(\x0e\x32\'.license_protocol.WidevinePsshData.Type:\x06SINGLE\x12\x14\n\x0ckey_sequence\x18\x0c \x01(\r\x12\x11\n\tgroup_ids\x18\r \x03(\x0c\x12\x45\n\rentitled_keys\x18\x0e \x03(\x0b\x32..license_protocol.WidevinePsshData.EntitledKey\x12\x15\n\rvideo_feature\x18\x0f \x01(\t\x12\x43\n\talgorithm\x18\x01 \x01(\x0e\x32,.license_protocol.WidevinePsshData.AlgorithmB\x02\x18\x01\x12\x14\n\x08provider\x18\x03 \x01(\tB\x02\x18\x01\x12\x16\n\ntrack_type\x18\x05 \x01(\tB\x02\x18\x01\x12\x12\n\x06policy\x18\x06 \x01(\tB\x02\x18\x01\x12\x1b\n\x0fgrouped_license\x18\x08 \x01(\x0c\x42\x02\x18\x01\x1az\n\x0b\x45ntitledKey\x12\x1a\n\x12\x65ntitlement_key_id\x18\x01 \x01(\x0c\x12\x0e\n\x06key_id\x18\x02 \x01(\x0c\x12\x0b\n\x03key\x18\x03 \x01(\x0c\x12\n\n\x02iv\x18\x04 \x01(\x0c\x12&\n\x1a\x65ntitlement_key_size_bytes\x18\x05 \x01(\r:\x02\x33\x32\"5\n\x04Type\x12\n\n\x06SINGLE\x10\x00\x12\x0f\n\x0b\x45NTITLEMENT\x10\x01\x12\x10\n\x0c\x45NTITLED_KEY\x10\x02\"(\n\tAlgorithm\x12\x0f\n\x0bUNENCRYPTED\x10\x00\x12\n\n\x06\x41\x45SCTR\x10\x01\"\xc6\x01\n\nFileHashes\x12\x0e\n\x06signer\x18\x01 \x01(\x0c\x12:\n\nsignatures\x18\x02 \x03(\x0b\x32&.license_protocol.FileHashes.Signature\x1al\n\tSignature\x12\x10\n\x08\x66ilename\x18\x01 \x01(\t\x12\x14\n\x0ctest_signing\x18\x02 \x01(\x08\x12\x12\n\nSHA512Hash\x18\x03 \x01(\x0c\x12\x10\n\x08main_exe\x18\x04 \x01(\x08\x12\x11\n\tsignature\x18\x05 \x01(\x0c*8\n\x0bLicenseType\x12\r\n\tSTREAMING\x10\x01\x12\x0b\n\x07OFFLINE\x10\x02\x12\r\n\tAUTOMATIC\x10\x03*\xd9\x01\n\x1aPlatformVerificationStatus\x12\x17\n\x13PLATFORM_UNVERIFIED\x10\x00\x12\x15\n\x11PLATFORM_TAMPERED\x10\x01\x12\x1e\n\x1aPLATFORM_SOFTWARE_VERIFIED\x10\x02\x12\x1e\n\x1aPLATFORM_HARDWARE_VERIFIED\x10\x03\x12\x1c\n\x18PLATFORM_NO_VERIFICATION\x10\x04\x12-\n)PLATFORM_SECURE_STORAGE_SOFTWARE_VERIFIED\x10\x05*D\n\x0fProtocolVersion\x12\x0f\n\x0bVERSION_2_0\x10\x14\x12\x0f\n\x0bVERSION_2_1\x10\x15\x12\x0f\n\x0bVERSION_2_2\x10\x16*\x86\x01\n\x12HashAlgorithmProto\x12\x1e\n\x1aHASH_ALGORITHM_UNSPECIFIED\x10\x00\x12\x18\n\x14HASH_ALGORITHM_SHA_1\x10\x01\x12\x1a\n\x16HASH_ALGORITHM_SHA_256\x10\x02\x12\x1a\n\x16HASH_ALGORITHM_SHA_384\x10\x03\x42\x02H\x03')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x16license_protocol.proto\x12\x10license_protocol\"\xb2\x01\n\x15LicenseIdentification\x12\x12\n\nrequest_id\x18\x01 \x01(\x0c\x12\x12\n\nsession_id\x18\x02 \x01(\x0c\x12\x13\n\x0bpurchase_id\x18\x03 \x01(\x0c\x12+\n\x04type\x18\x04 \x01(\x0e\x32\x1d.license_protocol.LicenseType\x12\x0f\n\x07version\x18\x05 \x01(\x05\x12\x1e\n\x16provider_session_token\x18\x06 \x01(\x0c\"\xcc\x17\n\x07License\x12\x33\n\x02id\x18\x01 \x01(\x0b\x32\'.license_protocol.LicenseIdentification\x12\x30\n\x06policy\x18\x02 \x01(\x0b\x32 .license_protocol.License.Policy\x12\x33\n\x03key\x18\x03 \x03(\x0b\x32&.license_protocol.License.KeyContainer\x12\x1a\n\x12license_start_time\x18\x04 \x01(\x03\x12*\n\x1bremote_attestation_verified\x18\x05 \x01(\x08:\x05\x66\x61lse\x12\x1d\n\x15provider_client_token\x18\x06 \x01(\x0c\x12\x19\n\x11protection_scheme\x18\x07 \x01(\r\x12\x17\n\x0fsrm_requirement\x18\x08 \x01(\x0c\x12\x12\n\nsrm_update\x18\t \x01(\x0c\x12l\n\x1cplatform_verification_status\x18\n \x01(\x0e\x32,.license_protocol.PlatformVerificationStatus:\x18PLATFORM_NO_VERIFICATION\x12\x11\n\tgroup_ids\x18\x0b \x03(\x0c\x1a\xae\x04\n\x06Policy\x12\x17\n\x08\x63\x61n_play\x18\x01 \x01(\x08:\x05\x66\x61lse\x12\x1a\n\x0b\x63\x61n_persist\x18\x02 \x01(\x08:\x05\x66\x61lse\x12\x18\n\tcan_renew\x18\x03 \x01(\x08:\x05\x66\x61lse\x12\"\n\x17rental_duration_seconds\x18\x04 \x01(\x03:\x01\x30\x12$\n\x19playback_duration_seconds\x18\x05 \x01(\x03:\x01\x30\x12\x23\n\x18license_duration_seconds\x18\x06 \x01(\x03:\x01\x30\x12,\n!renewal_recovery_duration_seconds\x18\x07 \x01(\x03:\x01\x30\x12\x1a\n\x12renewal_server_url\x18\x08 \x01(\t\x12 \n\x15renewal_delay_seconds\x18\t \x01(\x03:\x01\x30\x12)\n\x1erenewal_retry_interval_seconds\x18\n \x01(\x03:\x01\x30\x12\x1f\n\x10renew_with_usage\x18\x0b \x01(\x08:\x05\x66\x61lse\x12\'\n\x18\x61lways_include_client_id\x18\x0c \x01(\x08:\x05\x66\x61lse\x12*\n\x1fplay_start_grace_period_seconds\x18\r \x01(\x03:\x01\x30\x12-\n\x1esoft_enforce_playback_duration\x18\x0e \x01(\x08:\x05\x66\x61lse\x12*\n\x1csoft_enforce_rental_duration\x18\x0f \x01(\x08:\x04true\x1a\xc3\x0f\n\x0cKeyContainer\x12\n\n\x02id\x18\x01 \x01(\x0c\x12\n\n\x02iv\x18\x02 \x01(\x0c\x12\x0b\n\x03key\x18\x03 \x01(\x0c\x12<\n\x04type\x18\x04 \x01(\x0e\x32..license_protocol.License.KeyContainer.KeyType\x12U\n\x05level\x18\x05 \x01(\x0e\x32\x34.license_protocol.License.KeyContainer.SecurityLevel:\x10SW_SECURE_CRYPTO\x12T\n\x13required_protection\x18\x06 \x01(\x0b\x32\x37.license_protocol.License.KeyContainer.OutputProtection\x12U\n\x14requested_protection\x18\x07 \x01(\x0b\x32\x37.license_protocol.License.KeyContainer.OutputProtection\x12\x46\n\x0bkey_control\x18\x08 \x01(\x0b\x32\x31.license_protocol.License.KeyContainer.KeyControl\x12n\n operator_session_key_permissions\x18\t \x01(\x0b\x32\x44.license_protocol.License.KeyContainer.OperatorSessionKeyPermissions\x12\x66\n\x1cvideo_resolution_constraints\x18\n \x03(\x0b\x32@.license_protocol.License.KeyContainer.VideoResolutionConstraint\x12(\n\x19\x61nti_rollback_usage_table\x18\x0b \x01(\x08:\x05\x66\x61lse\x12\x13\n\x0btrack_label\x18\x0c \x01(\t\x1a\x33\n\nKeyControl\x12\x19\n\x11key_control_block\x18\x01 \x01(\x0c\x12\n\n\x02iv\x18\x02 \x01(\x0c\x1a\xfb\x04\n\x10OutputProtection\x12U\n\x04hdcp\x18\x01 \x01(\x0e\x32<.license_protocol.License.KeyContainer.OutputProtection.HDCP:\tHDCP_NONE\x12[\n\ncgms_flags\x18\x02 \x01(\x0e\x32<.license_protocol.License.KeyContainer.OutputProtection.CGMS:\tCGMS_NONE\x12n\n\rhdcp_srm_rule\x18\x03 \x01(\x0e\x32\x43.license_protocol.License.KeyContainer.OutputProtection.HdcpSrmRule:\x12HDCP_SRM_RULE_NONE\x12$\n\x15\x64isable_analog_output\x18\x04 \x01(\x08:\x05\x66\x61lse\x12%\n\x16\x64isable_digital_output\x18\x05 \x01(\x08:\x05\x66\x61lse\"y\n\x04HDCP\x12\r\n\tHDCP_NONE\x10\x00\x12\x0b\n\x07HDCP_V1\x10\x01\x12\x0b\n\x07HDCP_V2\x10\x02\x12\r\n\tHDCP_V2_1\x10\x03\x12\r\n\tHDCP_V2_2\x10\x04\x12\r\n\tHDCP_V2_3\x10\x05\x12\x1b\n\x16HDCP_NO_DIGITAL_OUTPUT\x10\xff\x01\"C\n\x04\x43GMS\x12\r\n\tCGMS_NONE\x10*\x12\r\n\tCOPY_FREE\x10\x00\x12\r\n\tCOPY_ONCE\x10\x02\x12\x0e\n\nCOPY_NEVER\x10\x03\"6\n\x0bHdcpSrmRule\x12\x16\n\x12HDCP_SRM_RULE_NONE\x10\x00\x12\x0f\n\x0b\x43URRENT_SRM\x10\x01\x1a\xaf\x01\n\x19VideoResolutionConstraint\x12\x1d\n\x15min_resolution_pixels\x18\x01 \x01(\r\x12\x1d\n\x15max_resolution_pixels\x18\x02 \x01(\r\x12T\n\x13required_protection\x18\x03 \x01(\x0b\x32\x37.license_protocol.License.KeyContainer.OutputProtection\x1a\x9d\x01\n\x1dOperatorSessionKeyPermissions\x12\x1c\n\rallow_encrypt\x18\x01 \x01(\x08:\x05\x66\x61lse\x12\x1c\n\rallow_decrypt\x18\x02 \x01(\x08:\x05\x66\x61lse\x12\x19\n\nallow_sign\x18\x03 \x01(\x08:\x05\x66\x61lse\x12%\n\x16\x61llow_signature_verify\x18\x04 \x01(\x08:\x05\x66\x61lse\"l\n\x07KeyType\x12\x0b\n\x07SIGNING\x10\x01\x12\x0b\n\x07\x43ONTENT\x10\x02\x12\x0f\n\x0bKEY_CONTROL\x10\x03\x12\x14\n\x10OPERATOR_SESSION\x10\x04\x12\x0f\n\x0b\x45NTITLEMENT\x10\x05\x12\x0f\n\x0bOEM_CONTENT\x10\x06\"z\n\rSecurityLevel\x12\x14\n\x10SW_SECURE_CRYPTO\x10\x01\x12\x14\n\x10SW_SECURE_DECODE\x10\x02\x12\x14\n\x10HW_SECURE_CRYPTO\x10\x03\x12\x14\n\x10HW_SECURE_DECODE\x10\x04\x12\x11\n\rHW_SECURE_ALL\x10\x05\"\xa3\x0c\n\x0eLicenseRequest\x12\x39\n\tclient_id\x18\x01 \x01(\x0b\x32&.license_protocol.ClientIdentification\x12J\n\ncontent_id\x18\x02 \x01(\x0b\x32\x36.license_protocol.LicenseRequest.ContentIdentification\x12:\n\x04type\x18\x03 \x01(\x0e\x32,.license_protocol.LicenseRequest.RequestType\x12\x14\n\x0crequest_time\x18\x04 \x01(\x03\x12$\n\x1ckey_control_nonce_deprecated\x18\x05 \x01(\x0c\x12H\n\x10protocol_version\x18\x06 \x01(\x0e\x32!.license_protocol.ProtocolVersion:\x0bVERSION_2_0\x12\x19\n\x11key_control_nonce\x18\x07 \x01(\r\x12L\n\x13\x65ncrypted_client_id\x18\x08 \x01(\x0b\x32/.license_protocol.EncryptedClientIdentification\x1a\xac\x08\n\x15\x43ontentIdentification\x12\x65\n\x12widevine_pssh_data\x18\x01 \x01(\x0b\x32G.license_protocol.LicenseRequest.ContentIdentification.WidevinePsshDataH\x00\x12W\n\x0bwebm_key_id\x18\x02 \x01(\x0b\x32@.license_protocol.LicenseRequest.ContentIdentification.WebmKeyIdH\x00\x12\x62\n\x10\x65xisting_license\x18\x03 \x01(\x0b\x32\x46.license_protocol.LicenseRequest.ContentIdentification.ExistingLicenseH\x00\x12T\n\tinit_data\x18\x04 \x01(\x0b\x32?.license_protocol.LicenseRequest.ContentIdentification.InitDataH\x00\x1an\n\x10WidevinePsshData\x12\x11\n\tpssh_data\x18\x01 \x03(\x0c\x12\x33\n\x0clicense_type\x18\x02 \x01(\x0e\x32\x1d.license_protocol.LicenseType\x12\x12\n\nrequest_id\x18\x03 \x01(\x0c\x1a\x64\n\tWebmKeyId\x12\x0e\n\x06header\x18\x01 \x01(\x0c\x12\x33\n\x0clicense_type\x18\x02 \x01(\x0e\x32\x1d.license_protocol.LicenseType\x12\x12\n\nrequest_id\x18\x03 \x01(\x0c\x1a\xb3\x01\n\x0f\x45xistingLicense\x12;\n\nlicense_id\x18\x01 \x01(\x0b\x32\'.license_protocol.LicenseIdentification\x12\x1d\n\x15seconds_since_started\x18\x02 \x01(\x03\x12!\n\x19seconds_since_last_played\x18\x03 \x01(\x03\x12!\n\x19session_usage_table_entry\x18\x04 \x01(\x0c\x1a\xf6\x01\n\x08InitData\x12j\n\x0einit_data_type\x18\x01 \x01(\x0e\x32L.license_protocol.LicenseRequest.ContentIdentification.InitData.InitDataType:\x04\x43\x45NC\x12\x11\n\tinit_data\x18\x02 \x01(\x0c\x12\x33\n\x0clicense_type\x18\x03 \x01(\x0e\x32\x1d.license_protocol.LicenseType\x12\x12\n\nrequest_id\x18\x04 \x01(\x0c\"\"\n\x0cInitDataType\x12\x08\n\x04\x43\x45NC\x10\x01\x12\x08\n\x04WEBM\x10\x02\x42\x14\n\x12\x63ontent_id_variant\"0\n\x0bRequestType\x12\x07\n\x03NEW\x10\x01\x12\x0b\n\x07RENEWAL\x10\x02\x12\x0b\n\x07RELEASE\x10\x03\"\xdd\x01\n\nMetricData\x12\x12\n\nstage_name\x18\x01 \x01(\t\x12;\n\x0bmetric_data\x18\x02 \x03(\x0b\x32&.license_protocol.MetricData.TypeValue\x1aT\n\tTypeValue\x12\x35\n\x04type\x18\x01 \x01(\x0e\x32\'.license_protocol.MetricData.MetricType\x12\x10\n\x05value\x18\x02 \x01(\x03:\x01\x30\"(\n\nMetricType\x12\x0b\n\x07LATENCY\x10\x01\x12\r\n\tTIMESTAMP\x10\x02\"K\n\x0bVersionInfo\x12\x1b\n\x13license_sdk_version\x18\x01 \x01(\t\x12\x1f\n\x17license_service_version\x18\x02 \x01(\t\"\xca\x05\n\rSignedMessage\x12\x39\n\x04type\x18\x01 \x01(\x0e\x32+.license_protocol.SignedMessage.MessageType\x12\x0b\n\x03msg\x18\x02 \x01(\x0c\x12\x11\n\tsignature\x18\x03 \x01(\x0c\x12\x13\n\x0bsession_key\x18\x04 \x01(\x0c\x12\x1a\n\x12remote_attestation\x18\x05 \x01(\x0c\x12\x31\n\x0bmetric_data\x18\x06 \x03(\x0b\x32\x1c.license_protocol.MetricData\x12;\n\x14service_version_info\x18\x07 \x01(\x0b\x32\x1d.license_protocol.VersionInfo\x12Y\n\x10session_key_type\x18\x08 \x01(\x0e\x32..license_protocol.SignedMessage.SessionKeyType:\x0fWRAPPED_AES_KEY\x12\x1e\n\x16oemcrypto_core_message\x18\t \x01(\x0c\"\xec\x01\n\x0bMessageType\x12\x13\n\x0fLICENSE_REQUEST\x10\x01\x12\x0b\n\x07LICENSE\x10\x02\x12\x12\n\x0e\x45RROR_RESPONSE\x10\x03\x12\x1f\n\x1bSERVICE_CERTIFICATE_REQUEST\x10\x04\x12\x17\n\x13SERVICE_CERTIFICATE\x10\x05\x12\x0f\n\x0bSUB_LICENSE\x10\x06\x12\x17\n\x13\x43\x41S_LICENSE_REQUEST\x10\x07\x12\x0f\n\x0b\x43\x41S_LICENSE\x10\x08\x12\x1c\n\x18\x45XTERNAL_LICENSE_REQUEST\x10\t\x12\x14\n\x10\x45XTERNAL_LICENSE\x10\n\"S\n\x0eSessionKeyType\x12\r\n\tUNDEFINED\x10\x00\x12\x13\n\x0fWRAPPED_AES_KEY\x10\x01\x12\x1d\n\x19\x45PHERMERAL_ECC_PUBLIC_KEY\x10\x02\"\xef\r\n\x14\x43lientIdentification\x12\x46\n\x04type\x18\x01 \x01(\x0e\x32\x30.license_protocol.ClientIdentification.TokenType:\x06KEYBOX\x12\r\n\x05token\x18\x02 \x01(\x0c\x12\x45\n\x0b\x63lient_info\x18\x03 \x03(\x0b\x32\x30.license_protocol.ClientIdentification.NameValue\x12\x1d\n\x15provider_client_token\x18\x04 \x01(\x0c\x12\x17\n\x0flicense_counter\x18\x05 \x01(\r\x12V\n\x13\x63lient_capabilities\x18\x06 \x01(\x0b\x32\x39.license_protocol.ClientIdentification.ClientCapabilities\x12\x10\n\x08vmp_data\x18\x07 \x01(\x0c\x12T\n\x12\x64\x65vice_credentials\x18\x08 \x03(\x0b\x32\x38.license_protocol.ClientIdentification.ClientCredentials\x1a(\n\tNameValue\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t\x1a\xb5\x08\n\x12\x43lientCapabilities\x12\x1b\n\x0c\x63lient_token\x18\x01 \x01(\x08:\x05\x66\x61lse\x12\x1c\n\rsession_token\x18\x02 \x01(\x08:\x05\x66\x61lse\x12+\n\x1cvideo_resolution_constraints\x18\x03 \x01(\x08:\x05\x66\x61lse\x12j\n\x10max_hdcp_version\x18\x04 \x01(\x0e\x32\x45.license_protocol.ClientIdentification.ClientCapabilities.HdcpVersion:\tHDCP_NONE\x12\x1e\n\x16oem_crypto_api_version\x18\x05 \x01(\r\x12(\n\x19\x61nti_rollback_usage_table\x18\x06 \x01(\x08:\x05\x66\x61lse\x12\x13\n\x0bsrm_version\x18\x07 \x01(\r\x12\x1d\n\x0e\x63\x61n_update_srm\x18\x08 \x01(\x08:\x05\x66\x61lse\x12t\n\x1esupported_certificate_key_type\x18\t \x03(\x0e\x32L.license_protocol.ClientIdentification.ClientCapabilities.CertificateKeyType\x12\x8d\x01\n\x1a\x61nalog_output_capabilities\x18\n \x01(\x0e\x32R.license_protocol.ClientIdentification.ClientCapabilities.AnalogOutputCapabilities:\x15\x41NALOG_OUTPUT_UNKNOWN\x12(\n\x19\x63\x61n_disable_analog_output\x18\x0b \x01(\x08:\x05\x66\x61lse\x12\x1f\n\x14resource_rating_tier\x18\x0c \x01(\r:\x01\x30\"\x80\x01\n\x0bHdcpVersion\x12\r\n\tHDCP_NONE\x10\x00\x12\x0b\n\x07HDCP_V1\x10\x01\x12\x0b\n\x07HDCP_V2\x10\x02\x12\r\n\tHDCP_V2_1\x10\x03\x12\r\n\tHDCP_V2_2\x10\x04\x12\r\n\tHDCP_V2_3\x10\x05\x12\x1b\n\x16HDCP_NO_DIGITAL_OUTPUT\x10\xff\x01\"i\n\x12\x43\x65rtificateKeyType\x12\x0c\n\x08RSA_2048\x10\x00\x12\x0c\n\x08RSA_3072\x10\x01\x12\x11\n\rECC_SECP256R1\x10\x02\x12\x11\n\rECC_SECP384R1\x10\x03\x12\x11\n\rECC_SECP521R1\x10\x04\"\x8d\x01\n\x18\x41nalogOutputCapabilities\x12\x19\n\x15\x41NALOG_OUTPUT_UNKNOWN\x10\x00\x12\x16\n\x12\x41NALOG_OUTPUT_NONE\x10\x01\x12\x1b\n\x17\x41NALOG_OUTPUT_SUPPORTED\x10\x02\x12!\n\x1d\x41NALOG_OUTPUT_SUPPORTS_CGMS_A\x10\x03\x1aj\n\x11\x43lientCredentials\x12\x46\n\x04type\x18\x01 \x01(\x0e\x32\x30.license_protocol.ClientIdentification.TokenType:\x06KEYBOX\x12\r\n\x05token\x18\x02 \x01(\x0c\"s\n\tTokenType\x12\n\n\x06KEYBOX\x10\x00\x12\x1a\n\x16\x44RM_DEVICE_CERTIFICATE\x10\x01\x12\"\n\x1eREMOTE_ATTESTATION_CERTIFICATE\x10\x02\x12\x1a\n\x16OEM_DEVICE_CERTIFICATE\x10\x03\"\xbb\x01\n\x1d\x45ncryptedClientIdentification\x12\x13\n\x0bprovider_id\x18\x01 \x01(\t\x12)\n!service_certificate_serial_number\x18\x02 \x01(\x0c\x12\x1b\n\x13\x65ncrypted_client_id\x18\x03 \x01(\x0c\x12\x1e\n\x16\x65ncrypted_client_id_iv\x18\x04 \x01(\x0c\x12\x1d\n\x15\x65ncrypted_privacy_key\x18\x05 \x01(\x0c\"\x83\x07\n\x0e\x44rmCertificate\x12\x33\n\x04type\x18\x01 \x01(\x0e\x32%.license_protocol.DrmCertificate.Type\x12\x15\n\rserial_number\x18\x02 \x01(\x0c\x12\x1d\n\x15\x63reation_time_seconds\x18\x03 \x01(\r\x12\x1f\n\x17\x65xpiration_time_seconds\x18\x0c \x01(\r\x12\x12\n\npublic_key\x18\x04 \x01(\x0c\x12\x11\n\tsystem_id\x18\x05 \x01(\r\x12\"\n\x16test_device_deprecated\x18\x06 \x01(\x08\x42\x02\x18\x01\x12\x13\n\x0bprovider_id\x18\x07 \x01(\t\x12\x43\n\rservice_types\x18\x08 \x03(\x0e\x32,.license_protocol.DrmCertificate.ServiceType\x12\x42\n\talgorithm\x18\t \x01(\x0e\x32*.license_protocol.DrmCertificate.Algorithm:\x03RSA\x12\x0e\n\x06rot_id\x18\n \x01(\x0c\x12\x46\n\x0e\x65ncryption_key\x18\x0b \x01(\x0b\x32..license_protocol.DrmCertificate.EncryptionKey\x1ag\n\rEncryptionKey\x12\x12\n\npublic_key\x18\x01 \x01(\x0c\x12\x42\n\talgorithm\x18\x02 \x01(\x0e\x32*.license_protocol.DrmCertificate.Algorithm:\x03RSA\"L\n\x04Type\x12\x08\n\x04ROOT\x10\x00\x12\x10\n\x0c\x44\x45VICE_MODEL\x10\x01\x12\n\n\x06\x44\x45VICE\x10\x02\x12\x0b\n\x07SERVICE\x10\x03\x12\x0f\n\x0bPROVISIONER\x10\x04\"\x86\x01\n\x0bServiceType\x12\x18\n\x14UNKNOWN_SERVICE_TYPE\x10\x00\x12\x16\n\x12LICENSE_SERVER_SDK\x10\x01\x12\x1c\n\x18LICENSE_SERVER_PROXY_SDK\x10\x02\x12\x14\n\x10PROVISIONING_SDK\x10\x03\x12\x11\n\rCAS_PROXY_SDK\x10\x04\"d\n\tAlgorithm\x12\x15\n\x11UNKNOWN_ALGORITHM\x10\x00\x12\x07\n\x03RSA\x10\x01\x12\x11\n\rECC_SECP256R1\x10\x02\x12\x11\n\rECC_SECP384R1\x10\x03\x12\x11\n\rECC_SECP521R1\x10\x04\"\xb8\x01\n\x14SignedDrmCertificate\x12\x17\n\x0f\x64rm_certificate\x18\x01 \x01(\x0c\x12\x11\n\tsignature\x18\x02 \x01(\x0c\x12\x36\n\x06signer\x18\x03 \x01(\x0b\x32&.license_protocol.SignedDrmCertificate\x12<\n\x0ehash_algorithm\x18\x04 \x01(\x0e\x32$.license_protocol.HashAlgorithmProto\"\xd5\x05\n\x10WidevinePsshData\x12\x0f\n\x07key_ids\x18\x02 \x03(\x0c\x12\x12\n\ncontent_id\x18\x04 \x01(\x0c\x12\x1b\n\x13\x63rypto_period_index\x18\x07 \x01(\r\x12\x19\n\x11protection_scheme\x18\t \x01(\r\x12\x1d\n\x15\x63rypto_period_seconds\x18\n \x01(\r\x12=\n\x04type\x18\x0b \x01(\x0e\x32\'.license_protocol.WidevinePsshData.Type:\x06SINGLE\x12\x14\n\x0ckey_sequence\x18\x0c \x01(\r\x12\x11\n\tgroup_ids\x18\r \x03(\x0c\x12\x45\n\rentitled_keys\x18\x0e \x03(\x0b\x32..license_protocol.WidevinePsshData.EntitledKey\x12\x15\n\rvideo_feature\x18\x0f \x01(\t\x12\x43\n\talgorithm\x18\x01 \x01(\x0e\x32,.license_protocol.WidevinePsshData.AlgorithmB\x02\x18\x01\x12\x14\n\x08provider\x18\x03 \x01(\tB\x02\x18\x01\x12\x16\n\ntrack_type\x18\x05 \x01(\tB\x02\x18\x01\x12\x12\n\x06policy\x18\x06 \x01(\tB\x02\x18\x01\x12\x1b\n\x0fgrouped_license\x18\x08 \x01(\x0c\x42\x02\x18\x01\x1az\n\x0b\x45ntitledKey\x12\x1a\n\x12\x65ntitlement_key_id\x18\x01 \x01(\x0c\x12\x0e\n\x06key_id\x18\x02 \x01(\x0c\x12\x0b\n\x03key\x18\x03 \x01(\x0c\x12\n\n\x02iv\x18\x04 \x01(\x0c\x12&\n\x1a\x65ntitlement_key_size_bytes\x18\x05 \x01(\r:\x02\x33\x32\"5\n\x04Type\x12\n\n\x06SINGLE\x10\x00\x12\x0f\n\x0b\x45NTITLEMENT\x10\x01\x12\x10\n\x0c\x45NTITLED_KEY\x10\x02\"(\n\tAlgorithm\x12\x0f\n\x0bUNENCRYPTED\x10\x00\x12\n\n\x06\x41\x45SCTR\x10\x01\"\xc6\x01\n\nFileHashes\x12\x0e\n\x06signer\x18\x01 \x01(\x0c\x12:\n\nsignatures\x18\x02 \x03(\x0b\x32&.license_protocol.FileHashes.Signature\x1al\n\tSignature\x12\x10\n\x08\x66ilename\x18\x01 \x01(\t\x12\x14\n\x0ctest_signing\x18\x02 \x01(\x08\x12\x12\n\nSHA512Hash\x18\x03 \x01(\x0c\x12\x10\n\x08main_exe\x18\x04 \x01(\x08\x12\x11\n\tsignature\x18\x05 \x01(\x0c*8\n\x0bLicenseType\x12\r\n\tSTREAMING\x10\x01\x12\x0b\n\x07OFFLINE\x10\x02\x12\r\n\tAUTOMATIC\x10\x03*\xd9\x01\n\x1aPlatformVerificationStatus\x12\x17\n\x13PLATFORM_UNVERIFIED\x10\x00\x12\x15\n\x11PLATFORM_TAMPERED\x10\x01\x12\x1e\n\x1aPLATFORM_SOFTWARE_VERIFIED\x10\x02\x12\x1e\n\x1aPLATFORM_HARDWARE_VERIFIED\x10\x03\x12\x1c\n\x18PLATFORM_NO_VERIFICATION\x10\x04\x12-\n)PLATFORM_SECURE_STORAGE_SOFTWARE_VERIFIED\x10\x05*D\n\x0fProtocolVersion\x12\x0f\n\x0bVERSION_2_0\x10\x14\x12\x0f\n\x0bVERSION_2_1\x10\x15\x12\x0f\n\x0bVERSION_2_2\x10\x16*\x86\x01\n\x12HashAlgorithmProto\x12\x1e\n\x1aHASH_ALGORITHM_UNSPECIFIED\x10\x00\x12\x18\n\x14HASH_ALGORITHM_SHA_1\x10\x01\x12\x1a\n\x16HASH_ALGORITHM_SHA_256\x10\x02\x12\x1a\n\x16HASH_ALGORITHM_SHA_384\x10\x03\x42\x02H\x03')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -399,15 +396,23 @@ class Device:
     @classmethod
     def from_files(
         cls,
-        private_key: Union[Path, str, bytes],
-        client_id: Union[Path, str, bytes],
-        vmp: Optional[Union[Path, str, bytes]] = None,
+        private_key: Optional[Union[Path, str, bytes]] = None,
+        client_id: Optional[Union[Path, str, bytes]] = None,
+        vmp: Union[Path, str, bytes, bool, None] = False,
         type_: Union[DeviceTypes, str] = DeviceTypes.ANDROID,
         security_level: int = 3,
-        flags: Optional[dict] = None
+        flags: Optional[dict] = None,
+        certificate: Optional[Union[Path, str, bytes]] = None,
+        key: Optional[Union[Path, str, bytes]] = None
     ) -> Device:
-        private_key_bytes = private_key if isinstance(private_key, bytes) else Path(private_key).read_bytes()
-        client_id_bytes = client_id if isinstance(client_id, bytes) else Path(client_id).read_bytes()
+        selected_private_key = key if key is not None else private_key
+        selected_client_id = certificate if certificate is not None else client_id
+        if selected_private_key is None:
+            raise ValueError("Device private key path or bytes are required.")
+        if selected_client_id is None:
+            raise ValueError("Device client certificate path or bytes are required.")
+        private_key_bytes = selected_private_key if isinstance(selected_private_key, bytes) else Path(selected_private_key).read_bytes()
+        client_id_bytes = selected_client_id if isinstance(selected_client_id, bytes) else Path(selected_client_id).read_bytes()
         device = cls(
             type_=type_,
             security_level=security_level,
@@ -429,16 +434,11 @@ class Device:
         return device
 
     @classmethod
-    def load_from_files(cls, private_key: Union[Path, str, bytes], client_id: Union[Path, str, bytes], vmp: Optional[Union[Path, str, bytes]] = None, type: Union[DeviceTypes, str] = DeviceTypes.ANDROID, type_: Optional[Union[DeviceTypes, str]] = None, security_level: int = 3, flags: Optional[dict] = None) -> Device:
+    def load_from_files(cls, private_key: Union[Path, str, bytes], client_id: Union[Path, str, bytes], vmp: Union[Path, str, bytes, bool, None] = False, type: Union[DeviceTypes, str] = DeviceTypes.ANDROID, type_: Optional[Union[DeviceTypes, str]] = None, security_level: int = 3, flags: Optional[dict] = None) -> Device:
         selected_type = type_ if type_ is not None else type
-        selected_vmp = None
-        if vmp is not None:
-            if isinstance(vmp, bytes):
-                selected_vmp = vmp
-            else:
-                vmp_path = Path(vmp)
-                if vmp_path.exists() and vmp_path.is_file():
-                    selected_vmp = vmp_path
+        selected_vmp = False
+        if vmp:
+            selected_vmp = vmp
         return cls.from_files(private_key=private_key,
                               client_id=client_id,
                               vmp=selected_vmp,
@@ -455,9 +455,9 @@ class Device:
         client_id_path = directory / "device_client_id_blob"
         vmp_path = directory / "device_vmp_blob"
         if not private_key_path.exists():
-            raise FileNotFoundError(f"Missing device private key file: {private_key_path}")
+            raise FileNotFoundError(f"Missing device private key file: {private_key_path.name}")
         if not client_id_path.exists():
-            raise FileNotFoundError(f"Missing device client ID blob file: {client_id_path}")
+            raise FileNotFoundError(f"Missing device client ID blob file: {client_id_path.name}")
         return cls.from_files(private_key=private_key_path, client_id=client_id_path, vmp=vmp_path if vmp_path.exists() else None,
             type_=type_,
             security_level=security_level,
@@ -554,7 +554,6 @@ __all__ = ("Device", "DeviceTypes")
 class PSSH:
     class SystemId:
         Widevine = UUID(hex="edef8ba979d64acea3c827dcd51d21ed")
-        PlayReady = UUID(hex="9a04f07998404286ab92e65be0885f95")
 
     def __init__(self, data: Union[Container, str, bytes], strict: bool = False):
         if not data:
@@ -589,16 +588,7 @@ class PSSH:
                         init_data=data_serialized
                     )))
                 except DecodeError:                              
-                    if "</WRMHEADER>".encode("utf-16-le") in data:
-                                                                                                        
-                        box = Box.parse(Box.build(dict(
-                            type=b"pssh",
-                            version=0,
-                            flags=0,
-                            system_ID=PSSH.SystemId.PlayReady,
-                            init_data=data
-                        )))
-                    elif strict:
+                    if strict:
                         raise DecodeError(f"Could not parse data as a {Container} nor a {WidevinePsshData}.")
                     else:                                               
                         box = Box.parse(Box.build(dict(type=b"pssh",
@@ -700,50 +690,6 @@ class PSSH:
                 for key_id in cenc_header.key_ids
             ]
 
-        if self.system_id == PSSH.SystemId.PlayReady:
-                                                           
-                                                                                                       
-            pro_data = BytesIO(self.init_data)
-            pro_length = int.from_bytes(pro_data.read(4), "little")
-            if pro_length != len(self.init_data):
-                raise ValueError("The PlayReadyObject seems to be corrupt (too big or small, or missing data).")
-            pro_record_count = int.from_bytes(pro_data.read(2), "little")
-
-            for _ in range(pro_record_count):
-                prr_type = int.from_bytes(pro_data.read(2), "little")
-                prr_length = int.from_bytes(pro_data.read(2), "little")
-                prr_value = pro_data.read(prr_length)
-                if prr_type != 0x01:                                           
-                    continue
-
-                wrm_ns = {"wrm": "http://schemas.microsoft.com/DRM/2007/03/PlayReadyHeader"}
-                prr_header = XML(prr_value.decode("utf-16-le"))
-                prr_header_version = prr_header.get("version")
-                if prr_header_version == "4.0.0.0":
-                    key_ids = [
-                        x.text
-                        for x in prr_header.findall("./wrm:DATA/wrm:KID", wrm_ns)
-                        if x.text
-                    ]
-                elif prr_header_version == "4.1.0.0":
-                    key_ids = [
-                        x.attrib["VALUE"]
-                        for x in prr_header.findall("./wrm:DATA/wrm:PROTECTINFO/wrm:KID", wrm_ns)
-                    ]
-                elif prr_header_version in ("4.2.0.0", "4.3.0.0"):                      
-                    key_ids = [
-                        x.attrib["VALUE"]
-                        for x in prr_header.findall("./wrm:DATA/wrm:PROTECTINFO/wrm:KIDS/wrm:KID", wrm_ns)
-                    ]
-                else:
-                    raise ValueError(f"Unsupported PlayReadyHeader version {prr_header_version}")
-
-                return [
-                    UUID(bytes=base64.b64decode(key_id))
-                    for key_id in key_ids
-                ]
-
-            raise ValueError("Unsupported PlayReadyObject, no PlayReadyHeader within the object.")
 
         raise ValueError(f"This PSSH is not supported by key_ids() property, {self.dumps()}")
 
@@ -760,64 +706,6 @@ class PSSH:
     def dumps(self) -> str:
         """Export the PSSH object as a full PSSH box in base64 form."""
         return base64.b64encode(self.dump()).decode()
-
-    def to_widevine(self) -> None:
-        """
-        Convert PlayReady PSSH data to Widevine PSSH data.
-
-        There's only a limited amount of information within a PlayReady PSSH header that
-        can be used in a Widevine PSSH Header. The converted data may or may not result
-        in an accepted PSSH. It depends on what the License Server is expecting.
-        """
-        if self.system_id == PSSH.SystemId.Widevine:
-            raise ValueError("This is already a Widevine PSSH")
-
-        widevine_pssh_data = WidevinePsshData(
-            key_ids=[x.bytes for x in self.key_ids],
-            algorithm="AESCTR"
-        )
-
-        if self.version == 1:                                                       
-            self.__key_ids = self.key_ids
-
-        self.init_data = widevine_pssh_data.SerializeToString()
-        self.system_id = PSSH.SystemId.Widevine
-
-    def to_playready(self, la_url: Optional[str] = None, lui_url: Optional[str] = None, ds_id: Optional[bytes] = None, decryptor_setup: Optional[str] = None, custom_data: Optional[str] = None) -> None:
-        
-        if self.system_id == PSSH.SystemId.PlayReady:
-            raise ValueError("This is already a PlayReady PSSH")
-
-        key_ids_xml = ""
-        for key_id in self.key_ids:
-                                                                                                
-            key_ids_xml += f"""
-            <KID ALGID="AESCTR" VALUE="{base64.b64encode(key_id.bytes).decode()}"></KID>
-            """
-
-        prr_value = f"""
-        <WRMHEADER xmlns="http://schemas.microsoft.com/DRM/2007/03/PlayReadyHeader" version="4.3.0.0">
-            <DATA>
-                <PROTECTINFO>
-                    <KIDS>{key_ids_xml}</KIDS>
-                </PROTECTINFO>
-                {'<LA_URL>%s</LA_URL>' % la_url if la_url else ''}
-                {'<LUI_URL>%s</LUI_URL>' % lui_url if lui_url else ''}
-                {'<DS_ID>%s</DS_ID>' % base64.b64encode(ds_id).decode() if ds_id else ''}
-                {'<DECRYPTORSETUP>%s</DECRYPTORSETUP>' % decryptor_setup if decryptor_setup else ''}
-                {'<CUSTOMATTRIBUTES xmlns="">%s</CUSTOMATTRIBUTES>' % custom_data if custom_data else ''}
-            </DATA>
-        </WRMHEADER>
-        """.encode("utf-16-le")
-
-        prr_length = len(prr_value).to_bytes(2, "little")
-        prr_type = (1).to_bytes(2, "little")                       
-        pro_record_count = (1).to_bytes(2, "little")
-        pro = pro_record_count + prr_type + prr_length + prr_value
-        pro = (len(pro) + 4).to_bytes(4, "little") + pro
-
-        self.init_data = pro
-        self.system_id = PSSH.SystemId.PlayReady
 
     def set_key_ids(self, key_ids: list[Union[UUID, str, bytes]]) -> None:
         if self.system_id != PSSH.SystemId.Widevine:
@@ -1223,9 +1111,9 @@ class Cdm:
         temp_dir_ = Path(temp_dir) if temp_dir else None
 
         if not input_file.is_file():
-            raise FileNotFoundError(f"Input file does not exist, {input_file}")
+            raise FileNotFoundError(f"Input file does not exist: {Path(input_file).name}")
         if output_file.is_file() and not exists_ok:
-            raise FileExistsError(f"Output file already exists, {output_file}")
+            raise FileExistsError(f"Output file already exists: {Path(output_file).name}")
 
         session = self.__sessions.get(session_id)
         if not session:
@@ -1372,18 +1260,48 @@ def build_device_from_args(args: argparse.Namespace) -> Device:
     raise ValueError("Provide a WVD file, a device directory, or both a private key file and a client ID blob file.")
 
 
+def short_path(value: Any) -> Any:
+    if value in (None, False):
+        return value
+    if isinstance(value, (str, Path)):
+        return Path(value).name
+    return value
+
+
+def emit_json(data: dict[str, Any]) -> None:
+    sys.stdout.write(json.dumps(data, indent=2, ensure_ascii=False) + "\n")
+
+
+def emit_line(message: str) -> None:
+    sys.stdout.write(message + "\n")
+
+
 def command_info(args: argparse.Namespace) -> int:
     device = build_device_from_args(args)
     client_info = {entry.name: entry.value for entry in device.client_id.client_info}
+    capabilities = {}
+    try:
+        capabilities = MessageToDict(device.client_id, preserving_proto_field_name=True).get("client_capabilities", {})
+    except Exception:
+        capabilities = {}
     result = {
-        "type": device.type.name,
-        "system_id": device.system_id,
-        "security_level": device.security_level,
-        "flags": dict(device.flags),
+        "input": {
+            "wvd": short_path(getattr(args, "wvd", None)),
+            "device_dir": short_path(getattr(args, "device_dir", None)),
+            "key": short_path(getattr(args, "key", None)),
+            "client_id": short_path(getattr(args, "client_id", None)),
+            "vmp": short_path(getattr(args, "vmp", None))
+        },
+        "device": {
+            "type": device.type.name,
+            "system_id": device.system_id,
+            "security_level": device.security_level,
+            "has_vmp": bool(device.client_id.vmp_data)
+        },
         "client_info": client_info,
-        "has_vmp": bool(device.client_id.vmp_data)
+        "client_capabilities": capabilities
     }
-    print(json.dumps(result, indent=2, ensure_ascii=False))
+    emit_json(result)
     return 0
 
 
@@ -1401,18 +1319,8 @@ def normalize_device_type(value: Union[str, DeviceTypes]) -> DeviceTypes:
 
 def build_wvd_name(device: Device, data: bytes) -> str:
     client_info = {entry.name: entry.value for entry in device.client_id.client_info}
-    company = (
-        client_info.get("company_name")
-        or client_info.get("manufacturer")
-        or client_info.get("vendor")
-        or "unknown"
-    )
-    model = (
-        client_info.get("model_name")
-        or client_info.get("model")
-        or client_info.get("device_name")
-        or "device"
-    )
+    company = client_info.get("company_name") or client_info.get("manufacturer") or client_info.get("vendor") or "unknown"
+    model = client_info.get("model_name") or client_info.get("model") or client_info.get("device_name") or "device"
     name = f"{company} {model}"
     if client_info.get("widevine_cdm_version"):
         name += f" {client_info['widevine_cdm_version']}"
@@ -1428,47 +1336,29 @@ def build_wvd_name(device: Device, data: bytes) -> str:
 def command_create_wvd(args: argparse.Namespace) -> int:
     device_type = normalize_device_type(args.type)
     if getattr(args, "device_dir", None):
-        device = Device.from_directory(
-            path=args.device_dir,
-            type_=device_type,
-            security_level=args.level,
-            flags=None
-        )
+        device = Device.from_directory(path=args.device_dir, type_=device_type, security_level=args.level, flags=None)
     else:
         if not args.key:
             raise ValueError("A private key file is required when --device-dir is not used.")
         if not args.client_id:
             raise ValueError("A client ID blob file is required when --device-dir is not used.")
-        device = Device.from_files(
-            private_key=args.key,
-            client_id=args.client_id,
-            vmp=args.vmp,
-            type_=device_type,
-            security_level=args.level,
-            flags=None
-        )
+        device = Device.from_files(certificate=args.client_id, key=args.key, vmp=args.vmp if args.vmp else False, type_=device_type, security_level=args.level, flags=None)
     wvd_data = device.dumps()
     if args.output:
         output = Path(args.output)
         if output.suffix:
             if output.suffix.lower() != ".wvd":
-                logging.getLogger("create-wvd").warning(
-                    "Saving WVD with extension '%s', but '.wvd' is recommended.",
-                    output.suffix
-                )
+                logging.getLogger("create-wvd").warning("Saving WVD with extension '%s', but '.wvd' is recommended.", output.suffix)
             output_path = output
         else:
             output_path = output / build_wvd_name(device, wvd_data)
     else:
         output_path = Path.cwd() / build_wvd_name(device, wvd_data)
     if output_path.exists() and not args.overwrite:
-        raise FileExistsError(f"Output already exists: {output_path}")
+        raise FileExistsError(f"Output already exists: {output_path.name}")
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_bytes(wvd_data)
-    print(f"Created Widevine Device file: {output_path}")
-    print(f"Type: {device.type.name}")
-    print(f"System ID: {device.system_id}")
-    print(f"Security Level: {device.security_level}")
+    emit_json({"status": "created", "file": output_path.name, "device": {"type": device.type.name, "system_id": device.system_id, "security_level": device.security_level}})
     return 0
 
 
@@ -1486,18 +1376,10 @@ def write_metadata_file(path: Path, device: Device) -> None:
     client_info = {entry.name: entry.value for entry in device.client_id.client_info}
     capabilities = {}
     try:
-        capabilities = MessageToDict(
-            device.client_id,
-            preserving_proto_field_name=True
-        ).get("client_capabilities", {})
+        capabilities = MessageToDict(device.client_id, preserving_proto_field_name=True).get("client_capabilities", {})
     except Exception:
         capabilities = {}
-    lines = [
-        "wvd:",
-        f"  device_type: {device.type.name}",
-        f"  security_level: {device.security_level}",
-        "client_info:",
-    ]
+    lines = ["wvd:", f"  device_type: {device.type.name}", f"  security_level: {device.security_level}", "client_info:"]
     for key, value in client_info.items():
         safe_value = str(value).replace("\\", "\\\\").replace('"', '\\"')
         lines.append(f'  {key}: "{safe_value}"')
@@ -1514,13 +1396,13 @@ def write_metadata_file(path: Path, device: Device) -> None:
 def command_export_wvd(args: argparse.Namespace) -> int:
     input_path = Path(args.input) if args.input else find_single_wvd_in_current_directory()
     if not input_path.is_file():
-        raise FileNotFoundError(f"WVD file does not exist: {input_path}")
+        raise FileNotFoundError(f"WVD file does not exist: {input_path.name}")
     device = Device.load(input_path)
     output_root = Path(args.output) if args.output else Path.cwd()
     output = output_root / input_path.stem
     if output.exists():
         if any(output.iterdir()) and not args.overwrite:
-            raise FileExistsError(f"Output directory is not empty: {output}")
+            raise FileExistsError(f"Output directory is not empty: {output.name}")
     else:
         output.mkdir(parents=True, exist_ok=True)
     metadata_path = output / "metadata.yml"
@@ -1533,33 +1415,27 @@ def command_export_wvd(args: argparse.Namespace) -> int:
         target_paths.append(vmp_path)
     for target in target_paths:
         if target.exists() and not args.overwrite:
-            raise FileExistsError(f"Output already exists: {target}")
+            raise FileExistsError(f"Output already exists: {target.name}")
     write_metadata_file(metadata_path, device)
     private_key_pem_path.write_text(device.private_key.export_key().decode(), encoding="utf-8")
     private_key_der_path.write_bytes(device.private_key.export_key(format="DER"))
     client_id_path.write_bytes(device.client_id.SerializeToString())
     if device.client_id.vmp_data:
         vmp_path.write_bytes(device.client_id.vmp_data)
-    print(f"Exported Widevine Device file: {input_path}")
-    print(f"Output directory: {output}")
-    print(f"Exported metadata: {metadata_path}")
-    print(f"Exported private key PEM: {private_key_pem_path}")
-    print(f"Exported private key DER: {private_key_der_path}")
-    print(f"Exported client ID: {client_id_path}")
+    exported_files = [metadata_path.name, private_key_pem_path.name, private_key_der_path.name, client_id_path.name]
     if device.client_id.vmp_data:
-        print(f"Exported VMP: {vmp_path}")
-    else:
-        print("No VMP data available.")
+        exported_files.append(vmp_path.name)
+    emit_json({"status": "exported", "source": input_path.name, "output_directory": output.name, "files": exported_files, "has_vmp": bool(device.client_id.vmp_data)})
     return 0
 
 
 def command_migrate_wvd(args: argparse.Namespace) -> int:
-    output = Path(args.output)
+    output = Path(args.output) if args.output else Path(args.input).with_suffix(".v2.wvd")
     if output.exists() and not args.overwrite:
-        raise FileExistsError(f"Output already exists: {output}")
+        raise FileExistsError(f"Output already exists: {output.name}")
     device = Device.migrate(Path(args.input).read_bytes())
     device.dump(output)
-    print(f"Migrated WVD file: {output}")
+    emit_json({"status": "migrated", "file": output.name})
     return 0
 
 
@@ -1569,13 +1445,16 @@ def command_license(args: argparse.Namespace) -> int:
     cdm = Cdm.from_device(device)
     session_id = cdm.open()
     try:
-        if args.privacy and args.certificate:
-            cdm.set_service_certificate(session_id, read_binary_argument(args.certificate))
+        if args.privacy and args.service_certificate:
+            cdm.set_service_certificate(session_id, read_binary_argument(args.service_certificate))
         challenge = cdm.get_license_challenge(session_id, pssh, args.license_type, privacy_mode=args.privacy)
         if args.challenge_output:
             Path(args.challenge_output).write_bytes(challenge)
+        if args.print_challenge:
+            emit_line(base64.b64encode(challenge).decode())
         if not args.server and not args.license_response:
-            print(base64.b64encode(challenge).decode())
+            if not args.print_challenge:
+                emit_line(base64.b64encode(challenge).decode())
             return 0
         if args.license_response:
             license_message = read_binary_argument(args.license_response)
@@ -1586,7 +1465,7 @@ def command_license(args: argparse.Namespace) -> int:
         cdm.parse_license(session_id, license_message)
         for key in cdm.get_keys(session_id):
             if args.include_non_content or key.type == "CONTENT":
-                print(f"[{key.type}] {key.kid.hex}:{key.key.hex()}")
+                emit_line(f"[{key.type}] {key.kid.hex}:{key.key.hex()}")
     finally:
         cdm.close(session_id)
     return 0
@@ -1594,92 +1473,76 @@ def command_license(args: argparse.Namespace) -> int:
 
 def command_pssh(args: argparse.Namespace) -> int:
     pssh = PSSH(args.input)
-    if args.to_widevine:
-        pssh.to_widevine()
     if args.set_key_id:
         pssh.set_key_ids([UUID(value) for value in args.set_key_id])
     if args.output == "base64":
-        print(pssh.dumps())
+        emit_line(pssh.dumps())
     elif args.output == "hex":
-        print(pssh.dump().hex())
+        emit_line(pssh.dump().hex())
     elif args.output == "json":
-        data = {
-            "system_id": str(pssh.system_id),
-            "key_ids": [str(key_id) for key_id in pssh.key_ids],
-            "init_data": pssh.init_data.hex() if isinstance(pssh.init_data, bytes) else str(pssh.init_data),
-            "box": pssh.dump().hex()
-        }
-        print(json.dumps(data, indent=2, ensure_ascii=False))
+        data = {"system_id": str(pssh.system_id), "key_ids": [str(key_id) for key_id in pssh.key_ids], "init_data": pssh.init_data.hex() if isinstance(pssh.init_data, bytes) else str(pssh.init_data), "box": pssh.dump().hex()}
+        emit_json(data)
     else:
         sys.stdout.buffer.write(pssh.dump())
     return 0
 
 
+def add_device_input_arguments(sp: argparse.ArgumentParser) -> None:
+    sp.add_argument("-w", "--wvd", help="Load a complete WVD file. This mode does not require key, client ID, or VMP arguments.")
+    sp.add_argument("-D", "--device-dir", help="Load a directory containing device_private_key, device_client_id_blob, and optional device_vmp_blob.")
+    sp.add_argument("-k", "--key", help="Device private key path, used with --client-id or --device-certificate.")
+    sp.add_argument("-c", "--client-id", help="Device client ID blob path.")
+    sp.add_argument("--device-certificate", dest="client_id", help="Alias for --client-id. Useful when the blob is referred to as a certificate.")
+    sp.add_argument("-vmp", "--vmp", default=False, help="Optional VMP blob path. Omit it when VMP is not needed.")
+    sp.add_argument("-t", "--type", default="ANDROID", help="Device type: ANDROID/android or CHROME/chrome.")
+    sp.add_argument("-l", "--level", type=int, default=3, help="Security level used when loading key/blob inputs. Default: 3.")
+
+
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(
-        prog="pywv",
-        description="Single-file Widevine utility with integrated proto, WVD, blob, key, local CDM, and PSSH support."
-    )
+    parser = argparse.ArgumentParser(prog="pywv", description="Single-file Widevine utility with integrated proto, WVD, blob, key, local CDM, and PSSH support.", epilog="License input modes: use --wvd for WVD-only execution, use --device-dir for exported device folders, or use --key with --client-id/--device-certificate and optional --vmp. The license command now also covers the former quick test workflow by providing default CWIP PSSH and server values.")
     parser.add_argument("-d", "--debug", action="store_true", help="Enable debug logging.")
     parser.add_argument("-v", "--version", action="store_true", help="Print version information.")
     sub = parser.add_subparsers(dest="cmd", required=False)
-
-    sp = sub.add_parser("info", help="Show information about a WVD file, device directory, or key/blob pair.")
-    sp.add_argument("-w", "--wvd")
-    sp.add_argument("-D", "--device-dir")
-    sp.add_argument("-k", "--key")
-    sp.add_argument("-c", "--client-id")
-    sp.add_argument("-vmp", "--vmp")
-    sp.add_argument("-t", "--type", default="ANDROID", help="Device type: ANDROID/android or CHROME/chrome.")
-    sp.add_argument("-l", "--level", type=int, default=3)
+    sp = sub.add_parser("info", help="Show detailed information about a WVD file, device directory, or key/blob pair.")
+    add_device_input_arguments(sp)
     sp.set_defaults(func=command_info)
-
     sp = sub.add_parser("create-wvd", help="Create a WVD v2 file from a device directory or key/blob files.")
     sp.add_argument("-D", "--device-dir")
     sp.add_argument("-k", "--key")
     sp.add_argument("-c", "--client-id")
-    sp.add_argument("-vmp", "--vmp")
+    sp.add_argument("--device-certificate", dest="client_id")
+    sp.add_argument("-vmp", "--vmp", default=False)
     sp.add_argument("-t", "--type", default="ANDROID", help="Device type: ANDROID/android or CHROME/chrome.")
     sp.add_argument("-l", "--level", type=int, default=3)
     sp.add_argument("-o", "--output", default=None)
     sp.add_argument("--overwrite", action="store_true")
     sp.set_defaults(func=command_create_wvd)
-
     sp = sub.add_parser("export-wvd", help="Export a WVD file into key, blob, and optional VMP files.")
     sp.add_argument("input", nargs="?")
     sp.add_argument("-o", "--output", default=None)
     sp.add_argument("--overwrite", action="store_true")
     sp.set_defaults(func=command_export_wvd)
-
     sp = sub.add_parser("migrate-wvd", help="Migrate a WVD v1 file to WVD v2.")
     sp.add_argument("input")
     sp.add_argument("-o", "--output", default=None)
     sp.add_argument("--overwrite", action="store_true")
     sp.set_defaults(func=command_migrate_wvd)
-
-    sp = sub.add_parser("license", help="Create a license challenge and optionally parse a license response.")
-    sp.add_argument("--pssh", required=True)
-    sp.add_argument("--server")
+    sp = sub.add_parser("license", help="Create a license challenge and optionally parse a license response. Supports WVD-only and key/blob modes.")
+    sp.add_argument("--pssh", default="AAAAW3Bzc2gAAAAA7e+LqXnWSs6jyCfc1R0h7QAAADsIARIQ62dqu8s0Xpa7z2FmMPGj2hoNd2lkZXZpbmVfdGVzdCIQZmtqM2xqYVNkZmFsa3IzaioCSEQyAA==")
+    sp.add_argument("--server", default="https://cwip-shaka-proxy.appspot.com/no_auth")
     sp.add_argument("-H", "--header", action="append", default=[])
-    sp.add_argument("-w", "--wvd")
-    sp.add_argument("-D", "--device-dir")
-    sp.add_argument("-k", "--key")
-    sp.add_argument("-c", "--client-id")
-    sp.add_argument("-vmp", "--vmp")
-    sp.add_argument("-t", "--type", default="ANDROID", help="Device type: ANDROID/android or CHROME/chrome.")
-    sp.add_argument("-l", "--level", type=int, default=3)
-    sp.add_argument("--certificate")
+    add_device_input_arguments(sp)
+    sp.add_argument("--service-certificate", help="Service privacy certificate used with --privacy.")
     sp.add_argument("--privacy", action="store_true")
     sp.add_argument("--license-type", default="STREAMING", choices=LicenseType.keys())
     sp.add_argument("--challenge-output")
     sp.add_argument("--license-response")
+    sp.add_argument("--print-challenge", action="store_true")
     sp.add_argument("--include-non-content", action="store_true")
     sp.set_defaults(func=command_license)
-
     sp = sub.add_parser("pssh", help="Inspect or rewrite PSSH data.")
     sp.add_argument("input")
     sp.add_argument("-o", "--output", default="base64", choices=["base64", "hex", "json", "raw"])
-    sp.add_argument("--to-widevine", action="store_true")
     sp.add_argument("--set-key-id", action="append")
     sp.set_defaults(func=command_pssh)
     return parser
@@ -1691,7 +1554,7 @@ if __name__ == "__main__":
     cli_args = cli_parser.parse_args()
     logging.basicConfig(level=logging.DEBUG if cli_args.debug else logging.INFO, format="%(name)s - %(levelname)s - %(message)s")
     if cli_args.version:
-        print(__version__)
+        emit_line(__version__)
         raise SystemExit(0)
     if not cli_args.cmd:
         cli_parser.print_help()
