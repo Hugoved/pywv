@@ -12,6 +12,7 @@ import string
 import subprocess
 import sys
 import time
+import unicodedata
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
@@ -19,165 +20,899 @@ from typing import Any, Optional, Union
 from uuid import UUID
 from zlib import crc32
 import requests
-from construct import BitStruct, Bytes, Const, ConstructError, Container
-from construct import Enum as CEnum
-from construct import Int8ub, Int16ub
-from construct import Optional as COptional
-from construct import Padded, Padding, Struct, this
-import construct
 from Crypto.Cipher import AES, PKCS1_OAEP
 from Crypto.Hash import CMAC, HMAC, SHA1, SHA256
 from Crypto.PublicKey import RSA
 from Crypto.Random import get_random_bytes
 from Crypto.Signature import pss
 from Crypto.Util import Padding as CryptoPadding
-from google.protobuf.message import DecodeError
-from google.protobuf.json_format import MessageToDict
-from pymp4.parser import Box
-try:
-    from unidecode import unidecode
-    from unidecode import UnidecodeError
-except Exception:
-    class UnidecodeError(Exception):
-        pass
-    def unidecode(value: str) -> str:
+
+__version__ = "2.1.0"
+
+class DecodeError(ValueError):
+    pass
+
+class _EnumMap:
+    def __init__(self, mapping):
+        self._name_to_value = dict(mapping)
+        self._value_to_name = {value: name for name, value in self._name_to_value.items()}
+
+    def Value(self, name):
+        if isinstance(name, int):
+            if name not in self._value_to_name:
+                raise ValueError(f"Unknown enum value: {name}")
+            return name
+        try:
+            return self._name_to_value[name]
+        except KeyError as exc:
+            raise ValueError(f"Unknown enum name: {name}") from exc
+
+    def Name(self, value):
+        try:
+            return self._value_to_name[int(value)]
+        except (KeyError, ValueError, TypeError) as exc:
+            raise ValueError(f"Unknown enum value: {value}") from exc
+
+    def keys(self):
+        return list(self._name_to_value.keys())
+
+    def values(self):
+        return list(self._name_to_value.values())
+
+    def items(self):
+        return list(self._name_to_value.items())
+
+    def __getattr__(self, name):
+        if name in self._name_to_value:
+            return self._name_to_value[name]
+        raise AttributeError(name)
+
+class _FieldSpec:
+    __slots__ = ("number", "kind", "repeated", "message", "enum", "default")
+
+    def __init__(self, number, kind, repeated=False, message=None, enum=None, default=None):
+        self.number = number
+        self.kind = kind
+        self.repeated = repeated
+        self.message = message
+        self.enum = enum
+        self.default = default
+
+class _FieldDescriptor:
+    __slots__ = ("name",)
+
+    def __init__(self, name):
+        self.name = name
+
+class _TrackedList(list):
+    def __init__(self, iterable=(), callback=None):
+        super().__init__(iterable)
+        self._callback = callback
+
+    def _changed(self):
+        if self._callback:
+            self._callback()
+
+    def __setitem__(self, key, value):
+        super().__setitem__(key, value)
+        self._changed()
+
+    def __delitem__(self, key):
+        super().__delitem__(key)
+        self._changed()
+
+    def append(self, value):
+        super().append(value)
+        self._changed()
+
+    def extend(self, values):
+        super().extend(values)
+        self._changed()
+
+    def insert(self, index, value):
+        super().insert(index, value)
+        self._changed()
+
+    def pop(self, index=-1):
+        value = super().pop(index)
+        self._changed()
         return value
 
-__version__ = "1.9.0"
+    def remove(self, value):
+        super().remove(value)
+        self._changed()
 
-from google.protobuf import descriptor as _descriptor
-from google.protobuf import descriptor_pool as _descriptor_pool
-from google.protobuf import symbol_database as _symbol_database
-from google.protobuf.internal import builder as _builder
-                                   
-_sym_db = _symbol_database.Default()
+    def clear(self):
+        super().clear()
+        self._changed()
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x16license_protocol.proto\x12\x10license_protocol\"\xb2\x01\n\x15LicenseIdentification\x12\x12\n\nrequest_id\x18\x01 \x01(\x0c\x12\x12\n\nsession_id\x18\x02 \x01(\x0c\x12\x13\n\x0bpurchase_id\x18\x03 \x01(\x0c\x12+\n\x04type\x18\x04 \x01(\x0e\x32\x1d.license_protocol.LicenseType\x12\x0f\n\x07version\x18\x05 \x01(\x05\x12\x1e\n\x16provider_session_token\x18\x06 \x01(\x0c\"\xcc\x17\n\x07License\x12\x33\n\x02id\x18\x01 \x01(\x0b\x32\'.license_protocol.LicenseIdentification\x12\x30\n\x06policy\x18\x02 \x01(\x0b\x32 .license_protocol.License.Policy\x12\x33\n\x03key\x18\x03 \x03(\x0b\x32&.license_protocol.License.KeyContainer\x12\x1a\n\x12license_start_time\x18\x04 \x01(\x03\x12*\n\x1bremote_attestation_verified\x18\x05 \x01(\x08:\x05\x66\x61lse\x12\x1d\n\x15provider_client_token\x18\x06 \x01(\x0c\x12\x19\n\x11protection_scheme\x18\x07 \x01(\r\x12\x17\n\x0fsrm_requirement\x18\x08 \x01(\x0c\x12\x12\n\nsrm_update\x18\t \x01(\x0c\x12l\n\x1cplatform_verification_status\x18\n \x01(\x0e\x32,.license_protocol.PlatformVerificationStatus:\x18PLATFORM_NO_VERIFICATION\x12\x11\n\tgroup_ids\x18\x0b \x03(\x0c\x1a\xae\x04\n\x06Policy\x12\x17\n\x08\x63\x61n_play\x18\x01 \x01(\x08:\x05\x66\x61lse\x12\x1a\n\x0b\x63\x61n_persist\x18\x02 \x01(\x08:\x05\x66\x61lse\x12\x18\n\tcan_renew\x18\x03 \x01(\x08:\x05\x66\x61lse\x12\"\n\x17rental_duration_seconds\x18\x04 \x01(\x03:\x01\x30\x12$\n\x19playback_duration_seconds\x18\x05 \x01(\x03:\x01\x30\x12\x23\n\x18license_duration_seconds\x18\x06 \x01(\x03:\x01\x30\x12,\n!renewal_recovery_duration_seconds\x18\x07 \x01(\x03:\x01\x30\x12\x1a\n\x12renewal_server_url\x18\x08 \x01(\t\x12 \n\x15renewal_delay_seconds\x18\t \x01(\x03:\x01\x30\x12)\n\x1erenewal_retry_interval_seconds\x18\n \x01(\x03:\x01\x30\x12\x1f\n\x10renew_with_usage\x18\x0b \x01(\x08:\x05\x66\x61lse\x12\'\n\x18\x61lways_include_client_id\x18\x0c \x01(\x08:\x05\x66\x61lse\x12*\n\x1fplay_start_grace_period_seconds\x18\r \x01(\x03:\x01\x30\x12-\n\x1esoft_enforce_playback_duration\x18\x0e \x01(\x08:\x05\x66\x61lse\x12*\n\x1csoft_enforce_rental_duration\x18\x0f \x01(\x08:\x04true\x1a\xc3\x0f\n\x0cKeyContainer\x12\n\n\x02id\x18\x01 \x01(\x0c\x12\n\n\x02iv\x18\x02 \x01(\x0c\x12\x0b\n\x03key\x18\x03 \x01(\x0c\x12<\n\x04type\x18\x04 \x01(\x0e\x32..license_protocol.License.KeyContainer.KeyType\x12U\n\x05level\x18\x05 \x01(\x0e\x32\x34.license_protocol.License.KeyContainer.SecurityLevel:\x10SW_SECURE_CRYPTO\x12T\n\x13required_protection\x18\x06 \x01(\x0b\x32\x37.license_protocol.License.KeyContainer.OutputProtection\x12U\n\x14requested_protection\x18\x07 \x01(\x0b\x32\x37.license_protocol.License.KeyContainer.OutputProtection\x12\x46\n\x0bkey_control\x18\x08 \x01(\x0b\x32\x31.license_protocol.License.KeyContainer.KeyControl\x12n\n operator_session_key_permissions\x18\t \x01(\x0b\x32\x44.license_protocol.License.KeyContainer.OperatorSessionKeyPermissions\x12\x66\n\x1cvideo_resolution_constraints\x18\n \x03(\x0b\x32@.license_protocol.License.KeyContainer.VideoResolutionConstraint\x12(\n\x19\x61nti_rollback_usage_table\x18\x0b \x01(\x08:\x05\x66\x61lse\x12\x13\n\x0btrack_label\x18\x0c \x01(\t\x1a\x33\n\nKeyControl\x12\x19\n\x11key_control_block\x18\x01 \x01(\x0c\x12\n\n\x02iv\x18\x02 \x01(\x0c\x1a\xfb\x04\n\x10OutputProtection\x12U\n\x04hdcp\x18\x01 \x01(\x0e\x32<.license_protocol.License.KeyContainer.OutputProtection.HDCP:\tHDCP_NONE\x12[\n\ncgms_flags\x18\x02 \x01(\x0e\x32<.license_protocol.License.KeyContainer.OutputProtection.CGMS:\tCGMS_NONE\x12n\n\rhdcp_srm_rule\x18\x03 \x01(\x0e\x32\x43.license_protocol.License.KeyContainer.OutputProtection.HdcpSrmRule:\x12HDCP_SRM_RULE_NONE\x12$\n\x15\x64isable_analog_output\x18\x04 \x01(\x08:\x05\x66\x61lse\x12%\n\x16\x64isable_digital_output\x18\x05 \x01(\x08:\x05\x66\x61lse\"y\n\x04HDCP\x12\r\n\tHDCP_NONE\x10\x00\x12\x0b\n\x07HDCP_V1\x10\x01\x12\x0b\n\x07HDCP_V2\x10\x02\x12\r\n\tHDCP_V2_1\x10\x03\x12\r\n\tHDCP_V2_2\x10\x04\x12\r\n\tHDCP_V2_3\x10\x05\x12\x1b\n\x16HDCP_NO_DIGITAL_OUTPUT\x10\xff\x01\"C\n\x04\x43GMS\x12\r\n\tCGMS_NONE\x10*\x12\r\n\tCOPY_FREE\x10\x00\x12\r\n\tCOPY_ONCE\x10\x02\x12\x0e\n\nCOPY_NEVER\x10\x03\"6\n\x0bHdcpSrmRule\x12\x16\n\x12HDCP_SRM_RULE_NONE\x10\x00\x12\x0f\n\x0b\x43URRENT_SRM\x10\x01\x1a\xaf\x01\n\x19VideoResolutionConstraint\x12\x1d\n\x15min_resolution_pixels\x18\x01 \x01(\r\x12\x1d\n\x15max_resolution_pixels\x18\x02 \x01(\r\x12T\n\x13required_protection\x18\x03 \x01(\x0b\x32\x37.license_protocol.License.KeyContainer.OutputProtection\x1a\x9d\x01\n\x1dOperatorSessionKeyPermissions\x12\x1c\n\rallow_encrypt\x18\x01 \x01(\x08:\x05\x66\x61lse\x12\x1c\n\rallow_decrypt\x18\x02 \x01(\x08:\x05\x66\x61lse\x12\x19\n\nallow_sign\x18\x03 \x01(\x08:\x05\x66\x61lse\x12%\n\x16\x61llow_signature_verify\x18\x04 \x01(\x08:\x05\x66\x61lse\"l\n\x07KeyType\x12\x0b\n\x07SIGNING\x10\x01\x12\x0b\n\x07\x43ONTENT\x10\x02\x12\x0f\n\x0bKEY_CONTROL\x10\x03\x12\x14\n\x10OPERATOR_SESSION\x10\x04\x12\x0f\n\x0b\x45NTITLEMENT\x10\x05\x12\x0f\n\x0bOEM_CONTENT\x10\x06\"z\n\rSecurityLevel\x12\x14\n\x10SW_SECURE_CRYPTO\x10\x01\x12\x14\n\x10SW_SECURE_DECODE\x10\x02\x12\x14\n\x10HW_SECURE_CRYPTO\x10\x03\x12\x14\n\x10HW_SECURE_DECODE\x10\x04\x12\x11\n\rHW_SECURE_ALL\x10\x05\"\xa3\x0c\n\x0eLicenseRequest\x12\x39\n\tclient_id\x18\x01 \x01(\x0b\x32&.license_protocol.ClientIdentification\x12J\n\ncontent_id\x18\x02 \x01(\x0b\x32\x36.license_protocol.LicenseRequest.ContentIdentification\x12:\n\x04type\x18\x03 \x01(\x0e\x32,.license_protocol.LicenseRequest.RequestType\x12\x14\n\x0crequest_time\x18\x04 \x01(\x03\x12$\n\x1ckey_control_nonce_deprecated\x18\x05 \x01(\x0c\x12H\n\x10protocol_version\x18\x06 \x01(\x0e\x32!.license_protocol.ProtocolVersion:\x0bVERSION_2_0\x12\x19\n\x11key_control_nonce\x18\x07 \x01(\r\x12L\n\x13\x65ncrypted_client_id\x18\x08 \x01(\x0b\x32/.license_protocol.EncryptedClientIdentification\x1a\xac\x08\n\x15\x43ontentIdentification\x12\x65\n\x12widevine_pssh_data\x18\x01 \x01(\x0b\x32G.license_protocol.LicenseRequest.ContentIdentification.WidevinePsshDataH\x00\x12W\n\x0bwebm_key_id\x18\x02 \x01(\x0b\x32@.license_protocol.LicenseRequest.ContentIdentification.WebmKeyIdH\x00\x12\x62\n\x10\x65xisting_license\x18\x03 \x01(\x0b\x32\x46.license_protocol.LicenseRequest.ContentIdentification.ExistingLicenseH\x00\x12T\n\tinit_data\x18\x04 \x01(\x0b\x32?.license_protocol.LicenseRequest.ContentIdentification.InitDataH\x00\x1an\n\x10WidevinePsshData\x12\x11\n\tpssh_data\x18\x01 \x03(\x0c\x12\x33\n\x0clicense_type\x18\x02 \x01(\x0e\x32\x1d.license_protocol.LicenseType\x12\x12\n\nrequest_id\x18\x03 \x01(\x0c\x1a\x64\n\tWebmKeyId\x12\x0e\n\x06header\x18\x01 \x01(\x0c\x12\x33\n\x0clicense_type\x18\x02 \x01(\x0e\x32\x1d.license_protocol.LicenseType\x12\x12\n\nrequest_id\x18\x03 \x01(\x0c\x1a\xb3\x01\n\x0f\x45xistingLicense\x12;\n\nlicense_id\x18\x01 \x01(\x0b\x32\'.license_protocol.LicenseIdentification\x12\x1d\n\x15seconds_since_started\x18\x02 \x01(\x03\x12!\n\x19seconds_since_last_played\x18\x03 \x01(\x03\x12!\n\x19session_usage_table_entry\x18\x04 \x01(\x0c\x1a\xf6\x01\n\x08InitData\x12j\n\x0einit_data_type\x18\x01 \x01(\x0e\x32L.license_protocol.LicenseRequest.ContentIdentification.InitData.InitDataType:\x04\x43\x45NC\x12\x11\n\tinit_data\x18\x02 \x01(\x0c\x12\x33\n\x0clicense_type\x18\x03 \x01(\x0e\x32\x1d.license_protocol.LicenseType\x12\x12\n\nrequest_id\x18\x04 \x01(\x0c\"\"\n\x0cInitDataType\x12\x08\n\x04\x43\x45NC\x10\x01\x12\x08\n\x04WEBM\x10\x02\x42\x14\n\x12\x63ontent_id_variant\"0\n\x0bRequestType\x12\x07\n\x03NEW\x10\x01\x12\x0b\n\x07RENEWAL\x10\x02\x12\x0b\n\x07RELEASE\x10\x03\"\xdd\x01\n\nMetricData\x12\x12\n\nstage_name\x18\x01 \x01(\t\x12;\n\x0bmetric_data\x18\x02 \x03(\x0b\x32&.license_protocol.MetricData.TypeValue\x1aT\n\tTypeValue\x12\x35\n\x04type\x18\x01 \x01(\x0e\x32\'.license_protocol.MetricData.MetricType\x12\x10\n\x05value\x18\x02 \x01(\x03:\x01\x30\"(\n\nMetricType\x12\x0b\n\x07LATENCY\x10\x01\x12\r\n\tTIMESTAMP\x10\x02\"K\n\x0bVersionInfo\x12\x1b\n\x13license_sdk_version\x18\x01 \x01(\t\x12\x1f\n\x17license_service_version\x18\x02 \x01(\t\"\xca\x05\n\rSignedMessage\x12\x39\n\x04type\x18\x01 \x01(\x0e\x32+.license_protocol.SignedMessage.MessageType\x12\x0b\n\x03msg\x18\x02 \x01(\x0c\x12\x11\n\tsignature\x18\x03 \x01(\x0c\x12\x13\n\x0bsession_key\x18\x04 \x01(\x0c\x12\x1a\n\x12remote_attestation\x18\x05 \x01(\x0c\x12\x31\n\x0bmetric_data\x18\x06 \x03(\x0b\x32\x1c.license_protocol.MetricData\x12;\n\x14service_version_info\x18\x07 \x01(\x0b\x32\x1d.license_protocol.VersionInfo\x12Y\n\x10session_key_type\x18\x08 \x01(\x0e\x32..license_protocol.SignedMessage.SessionKeyType:\x0fWRAPPED_AES_KEY\x12\x1e\n\x16oemcrypto_core_message\x18\t \x01(\x0c\"\xec\x01\n\x0bMessageType\x12\x13\n\x0fLICENSE_REQUEST\x10\x01\x12\x0b\n\x07LICENSE\x10\x02\x12\x12\n\x0e\x45RROR_RESPONSE\x10\x03\x12\x1f\n\x1bSERVICE_CERTIFICATE_REQUEST\x10\x04\x12\x17\n\x13SERVICE_CERTIFICATE\x10\x05\x12\x0f\n\x0bSUB_LICENSE\x10\x06\x12\x17\n\x13\x43\x41S_LICENSE_REQUEST\x10\x07\x12\x0f\n\x0b\x43\x41S_LICENSE\x10\x08\x12\x1c\n\x18\x45XTERNAL_LICENSE_REQUEST\x10\t\x12\x14\n\x10\x45XTERNAL_LICENSE\x10\n\"S\n\x0eSessionKeyType\x12\r\n\tUNDEFINED\x10\x00\x12\x13\n\x0fWRAPPED_AES_KEY\x10\x01\x12\x1d\n\x19\x45PHERMERAL_ECC_PUBLIC_KEY\x10\x02\"\xef\r\n\x14\x43lientIdentification\x12\x46\n\x04type\x18\x01 \x01(\x0e\x32\x30.license_protocol.ClientIdentification.TokenType:\x06KEYBOX\x12\r\n\x05token\x18\x02 \x01(\x0c\x12\x45\n\x0b\x63lient_info\x18\x03 \x03(\x0b\x32\x30.license_protocol.ClientIdentification.NameValue\x12\x1d\n\x15provider_client_token\x18\x04 \x01(\x0c\x12\x17\n\x0flicense_counter\x18\x05 \x01(\r\x12V\n\x13\x63lient_capabilities\x18\x06 \x01(\x0b\x32\x39.license_protocol.ClientIdentification.ClientCapabilities\x12\x10\n\x08vmp_data\x18\x07 \x01(\x0c\x12T\n\x12\x64\x65vice_credentials\x18\x08 \x03(\x0b\x32\x38.license_protocol.ClientIdentification.ClientCredentials\x1a(\n\tNameValue\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t\x1a\xb5\x08\n\x12\x43lientCapabilities\x12\x1b\n\x0c\x63lient_token\x18\x01 \x01(\x08:\x05\x66\x61lse\x12\x1c\n\rsession_token\x18\x02 \x01(\x08:\x05\x66\x61lse\x12+\n\x1cvideo_resolution_constraints\x18\x03 \x01(\x08:\x05\x66\x61lse\x12j\n\x10max_hdcp_version\x18\x04 \x01(\x0e\x32\x45.license_protocol.ClientIdentification.ClientCapabilities.HdcpVersion:\tHDCP_NONE\x12\x1e\n\x16oem_crypto_api_version\x18\x05 \x01(\r\x12(\n\x19\x61nti_rollback_usage_table\x18\x06 \x01(\x08:\x05\x66\x61lse\x12\x13\n\x0bsrm_version\x18\x07 \x01(\r\x12\x1d\n\x0e\x63\x61n_update_srm\x18\x08 \x01(\x08:\x05\x66\x61lse\x12t\n\x1esupported_certificate_key_type\x18\t \x03(\x0e\x32L.license_protocol.ClientIdentification.ClientCapabilities.CertificateKeyType\x12\x8d\x01\n\x1a\x61nalog_output_capabilities\x18\n \x01(\x0e\x32R.license_protocol.ClientIdentification.ClientCapabilities.AnalogOutputCapabilities:\x15\x41NALOG_OUTPUT_UNKNOWN\x12(\n\x19\x63\x61n_disable_analog_output\x18\x0b \x01(\x08:\x05\x66\x61lse\x12\x1f\n\x14resource_rating_tier\x18\x0c \x01(\r:\x01\x30\"\x80\x01\n\x0bHdcpVersion\x12\r\n\tHDCP_NONE\x10\x00\x12\x0b\n\x07HDCP_V1\x10\x01\x12\x0b\n\x07HDCP_V2\x10\x02\x12\r\n\tHDCP_V2_1\x10\x03\x12\r\n\tHDCP_V2_2\x10\x04\x12\r\n\tHDCP_V2_3\x10\x05\x12\x1b\n\x16HDCP_NO_DIGITAL_OUTPUT\x10\xff\x01\"i\n\x12\x43\x65rtificateKeyType\x12\x0c\n\x08RSA_2048\x10\x00\x12\x0c\n\x08RSA_3072\x10\x01\x12\x11\n\rECC_SECP256R1\x10\x02\x12\x11\n\rECC_SECP384R1\x10\x03\x12\x11\n\rECC_SECP521R1\x10\x04\"\x8d\x01\n\x18\x41nalogOutputCapabilities\x12\x19\n\x15\x41NALOG_OUTPUT_UNKNOWN\x10\x00\x12\x16\n\x12\x41NALOG_OUTPUT_NONE\x10\x01\x12\x1b\n\x17\x41NALOG_OUTPUT_SUPPORTED\x10\x02\x12!\n\x1d\x41NALOG_OUTPUT_SUPPORTS_CGMS_A\x10\x03\x1aj\n\x11\x43lientCredentials\x12\x46\n\x04type\x18\x01 \x01(\x0e\x32\x30.license_protocol.ClientIdentification.TokenType:\x06KEYBOX\x12\r\n\x05token\x18\x02 \x01(\x0c\"s\n\tTokenType\x12\n\n\x06KEYBOX\x10\x00\x12\x1a\n\x16\x44RM_DEVICE_CERTIFICATE\x10\x01\x12\"\n\x1eREMOTE_ATTESTATION_CERTIFICATE\x10\x02\x12\x1a\n\x16OEM_DEVICE_CERTIFICATE\x10\x03\"\xbb\x01\n\x1d\x45ncryptedClientIdentification\x12\x13\n\x0bprovider_id\x18\x01 \x01(\t\x12)\n!service_certificate_serial_number\x18\x02 \x01(\x0c\x12\x1b\n\x13\x65ncrypted_client_id\x18\x03 \x01(\x0c\x12\x1e\n\x16\x65ncrypted_client_id_iv\x18\x04 \x01(\x0c\x12\x1d\n\x15\x65ncrypted_privacy_key\x18\x05 \x01(\x0c\"\x83\x07\n\x0e\x44rmCertificate\x12\x33\n\x04type\x18\x01 \x01(\x0e\x32%.license_protocol.DrmCertificate.Type\x12\x15\n\rserial_number\x18\x02 \x01(\x0c\x12\x1d\n\x15\x63reation_time_seconds\x18\x03 \x01(\r\x12\x1f\n\x17\x65xpiration_time_seconds\x18\x0c \x01(\r\x12\x12\n\npublic_key\x18\x04 \x01(\x0c\x12\x11\n\tsystem_id\x18\x05 \x01(\r\x12\"\n\x16test_device_deprecated\x18\x06 \x01(\x08\x42\x02\x18\x01\x12\x13\n\x0bprovider_id\x18\x07 \x01(\t\x12\x43\n\rservice_types\x18\x08 \x03(\x0e\x32,.license_protocol.DrmCertificate.ServiceType\x12\x42\n\talgorithm\x18\t \x01(\x0e\x32*.license_protocol.DrmCertificate.Algorithm:\x03RSA\x12\x0e\n\x06rot_id\x18\n \x01(\x0c\x12\x46\n\x0e\x65ncryption_key\x18\x0b \x01(\x0b\x32..license_protocol.DrmCertificate.EncryptionKey\x1ag\n\rEncryptionKey\x12\x12\n\npublic_key\x18\x01 \x01(\x0c\x12\x42\n\talgorithm\x18\x02 \x01(\x0e\x32*.license_protocol.DrmCertificate.Algorithm:\x03RSA\"L\n\x04Type\x12\x08\n\x04ROOT\x10\x00\x12\x10\n\x0c\x44\x45VICE_MODEL\x10\x01\x12\n\n\x06\x44\x45VICE\x10\x02\x12\x0b\n\x07SERVICE\x10\x03\x12\x0f\n\x0bPROVISIONER\x10\x04\"\x86\x01\n\x0bServiceType\x12\x18\n\x14UNKNOWN_SERVICE_TYPE\x10\x00\x12\x16\n\x12LICENSE_SERVER_SDK\x10\x01\x12\x1c\n\x18LICENSE_SERVER_PROXY_SDK\x10\x02\x12\x14\n\x10PROVISIONING_SDK\x10\x03\x12\x11\n\rCAS_PROXY_SDK\x10\x04\"d\n\tAlgorithm\x12\x15\n\x11UNKNOWN_ALGORITHM\x10\x00\x12\x07\n\x03RSA\x10\x01\x12\x11\n\rECC_SECP256R1\x10\x02\x12\x11\n\rECC_SECP384R1\x10\x03\x12\x11\n\rECC_SECP521R1\x10\x04\"\xb8\x01\n\x14SignedDrmCertificate\x12\x17\n\x0f\x64rm_certificate\x18\x01 \x01(\x0c\x12\x11\n\tsignature\x18\x02 \x01(\x0c\x12\x36\n\x06signer\x18\x03 \x01(\x0b\x32&.license_protocol.SignedDrmCertificate\x12<\n\x0ehash_algorithm\x18\x04 \x01(\x0e\x32$.license_protocol.HashAlgorithmProto\"\xd5\x05\n\x10WidevinePsshData\x12\x0f\n\x07key_ids\x18\x02 \x03(\x0c\x12\x12\n\ncontent_id\x18\x04 \x01(\x0c\x12\x1b\n\x13\x63rypto_period_index\x18\x07 \x01(\r\x12\x19\n\x11protection_scheme\x18\t \x01(\r\x12\x1d\n\x15\x63rypto_period_seconds\x18\n \x01(\r\x12=\n\x04type\x18\x0b \x01(\x0e\x32\'.license_protocol.WidevinePsshData.Type:\x06SINGLE\x12\x14\n\x0ckey_sequence\x18\x0c \x01(\r\x12\x11\n\tgroup_ids\x18\r \x03(\x0c\x12\x45\n\rentitled_keys\x18\x0e \x03(\x0b\x32..license_protocol.WidevinePsshData.EntitledKey\x12\x15\n\rvideo_feature\x18\x0f \x01(\t\x12\x43\n\talgorithm\x18\x01 \x01(\x0e\x32,.license_protocol.WidevinePsshData.AlgorithmB\x02\x18\x01\x12\x14\n\x08provider\x18\x03 \x01(\tB\x02\x18\x01\x12\x16\n\ntrack_type\x18\x05 \x01(\tB\x02\x18\x01\x12\x12\n\x06policy\x18\x06 \x01(\tB\x02\x18\x01\x12\x1b\n\x0fgrouped_license\x18\x08 \x01(\x0c\x42\x02\x18\x01\x1az\n\x0b\x45ntitledKey\x12\x1a\n\x12\x65ntitlement_key_id\x18\x01 \x01(\x0c\x12\x0e\n\x06key_id\x18\x02 \x01(\x0c\x12\x0b\n\x03key\x18\x03 \x01(\x0c\x12\n\n\x02iv\x18\x04 \x01(\x0c\x12&\n\x1a\x65ntitlement_key_size_bytes\x18\x05 \x01(\r:\x02\x33\x32\"5\n\x04Type\x12\n\n\x06SINGLE\x10\x00\x12\x0f\n\x0b\x45NTITLEMENT\x10\x01\x12\x10\n\x0c\x45NTITLED_KEY\x10\x02\"(\n\tAlgorithm\x12\x0f\n\x0bUNENCRYPTED\x10\x00\x12\n\n\x06\x41\x45SCTR\x10\x01\"\xc6\x01\n\nFileHashes\x12\x0e\n\x06signer\x18\x01 \x01(\x0c\x12:\n\nsignatures\x18\x02 \x03(\x0b\x32&.license_protocol.FileHashes.Signature\x1al\n\tSignature\x12\x10\n\x08\x66ilename\x18\x01 \x01(\t\x12\x14\n\x0ctest_signing\x18\x02 \x01(\x08\x12\x12\n\nSHA512Hash\x18\x03 \x01(\x0c\x12\x10\n\x08main_exe\x18\x04 \x01(\x08\x12\x11\n\tsignature\x18\x05 \x01(\x0c*8\n\x0bLicenseType\x12\r\n\tSTREAMING\x10\x01\x12\x0b\n\x07OFFLINE\x10\x02\x12\r\n\tAUTOMATIC\x10\x03*\xd9\x01\n\x1aPlatformVerificationStatus\x12\x17\n\x13PLATFORM_UNVERIFIED\x10\x00\x12\x15\n\x11PLATFORM_TAMPERED\x10\x01\x12\x1e\n\x1aPLATFORM_SOFTWARE_VERIFIED\x10\x02\x12\x1e\n\x1aPLATFORM_HARDWARE_VERIFIED\x10\x03\x12\x1c\n\x18PLATFORM_NO_VERIFICATION\x10\x04\x12-\n)PLATFORM_SECURE_STORAGE_SOFTWARE_VERIFIED\x10\x05*D\n\x0fProtocolVersion\x12\x0f\n\x0bVERSION_2_0\x10\x14\x12\x0f\n\x0bVERSION_2_1\x10\x15\x12\x0f\n\x0bVERSION_2_2\x10\x16*\x86\x01\n\x12HashAlgorithmProto\x12\x1e\n\x1aHASH_ALGORITHM_UNSPECIFIED\x10\x00\x12\x18\n\x14HASH_ALGORITHM_SHA_1\x10\x01\x12\x1a\n\x16HASH_ALGORITHM_SHA_256\x10\x02\x12\x1a\n\x16HASH_ALGORITHM_SHA_384\x10\x03\x42\x02H\x03')
+    def reverse(self):
+        super().reverse()
+        self._changed()
 
-_globals = globals()
-_builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
-_builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'license_protocol_pb2', _globals)
-if not _descriptor._USE_C_DESCRIPTORS:
-  _globals['DESCRIPTOR']._loaded_options = None
-  _globals['DESCRIPTOR']._serialized_options = b'H\003'
-  _globals['_DRMCERTIFICATE'].fields_by_name['test_device_deprecated']._loaded_options = None
-  _globals['_DRMCERTIFICATE'].fields_by_name['test_device_deprecated']._serialized_options = b'\030\001'
-  _globals['_WIDEVINEPSSHDATA'].fields_by_name['algorithm']._loaded_options = None
-  _globals['_WIDEVINEPSSHDATA'].fields_by_name['algorithm']._serialized_options = b'\030\001'
-  _globals['_WIDEVINEPSSHDATA'].fields_by_name['provider']._loaded_options = None
-  _globals['_WIDEVINEPSSHDATA'].fields_by_name['provider']._serialized_options = b'\030\001'
-  _globals['_WIDEVINEPSSHDATA'].fields_by_name['track_type']._loaded_options = None
-  _globals['_WIDEVINEPSSHDATA'].fields_by_name['track_type']._serialized_options = b'\030\001'
-  _globals['_WIDEVINEPSSHDATA'].fields_by_name['policy']._loaded_options = None
-  _globals['_WIDEVINEPSSHDATA'].fields_by_name['policy']._serialized_options = b'\030\001'
-  _globals['_WIDEVINEPSSHDATA'].fields_by_name['grouped_license']._loaded_options = None
-  _globals['_WIDEVINEPSSHDATA'].fields_by_name['grouped_license']._serialized_options = b'\030\001'
-  _globals['_LICENSETYPE']._serialized_start=9826
-  _globals['_LICENSETYPE']._serialized_end=9882
-  _globals['_PLATFORMVERIFICATIONSTATUS']._serialized_start=9885
-  _globals['_PLATFORMVERIFICATIONSTATUS']._serialized_end=10102
-  _globals['_PROTOCOLVERSION']._serialized_start=10104
-  _globals['_PROTOCOLVERSION']._serialized_end=10172
-  _globals['_HASHALGORITHMPROTO']._serialized_start=10175
-  _globals['_HASHALGORITHMPROTO']._serialized_end=10309
-  _globals['_LICENSEIDENTIFICATION']._serialized_start=45
-  _globals['_LICENSEIDENTIFICATION']._serialized_end=223
-  _globals['_LICENSE']._serialized_start=226
-  _globals['_LICENSE']._serialized_end=3246
-  _globals['_LICENSE_POLICY']._serialized_start=698
-  _globals['_LICENSE_POLICY']._serialized_end=1256
-  _globals['_LICENSE_KEYCONTAINER']._serialized_start=1259
-  _globals['_LICENSE_KEYCONTAINER']._serialized_end=3246
-  _globals['_LICENSE_KEYCONTAINER_KEYCONTROL']._serialized_start=1985
-  _globals['_LICENSE_KEYCONTAINER_KEYCONTROL']._serialized_end=2036
-  _globals['_LICENSE_KEYCONTAINER_OUTPUTPROTECTION']._serialized_start=2039
-  _globals['_LICENSE_KEYCONTAINER_OUTPUTPROTECTION']._serialized_end=2674
-  _globals['_LICENSE_KEYCONTAINER_OUTPUTPROTECTION_HDCP']._serialized_start=2428
-  _globals['_LICENSE_KEYCONTAINER_OUTPUTPROTECTION_HDCP']._serialized_end=2549
-  _globals['_LICENSE_KEYCONTAINER_OUTPUTPROTECTION_CGMS']._serialized_start=2551
-  _globals['_LICENSE_KEYCONTAINER_OUTPUTPROTECTION_CGMS']._serialized_end=2618
-  _globals['_LICENSE_KEYCONTAINER_OUTPUTPROTECTION_HDCPSRMRULE']._serialized_start=2620
-  _globals['_LICENSE_KEYCONTAINER_OUTPUTPROTECTION_HDCPSRMRULE']._serialized_end=2674
-  _globals['_LICENSE_KEYCONTAINER_VIDEORESOLUTIONCONSTRAINT']._serialized_start=2677
-  _globals['_LICENSE_KEYCONTAINER_VIDEORESOLUTIONCONSTRAINT']._serialized_end=2852
-  _globals['_LICENSE_KEYCONTAINER_OPERATORSESSIONKEYPERMISSIONS']._serialized_start=2855
-  _globals['_LICENSE_KEYCONTAINER_OPERATORSESSIONKEYPERMISSIONS']._serialized_end=3012
-  _globals['_LICENSE_KEYCONTAINER_KEYTYPE']._serialized_start=3014
-  _globals['_LICENSE_KEYCONTAINER_KEYTYPE']._serialized_end=3122
-  _globals['_LICENSE_KEYCONTAINER_SECURITYLEVEL']._serialized_start=3124
-  _globals['_LICENSE_KEYCONTAINER_SECURITYLEVEL']._serialized_end=3246
-  _globals['_LICENSEREQUEST']._serialized_start=3249
-  _globals['_LICENSEREQUEST']._serialized_end=4820
-  _globals['_LICENSEREQUEST_CONTENTIDENTIFICATION']._serialized_start=3702
-  _globals['_LICENSEREQUEST_CONTENTIDENTIFICATION']._serialized_end=4770
-  _globals['_LICENSEREQUEST_CONTENTIDENTIFICATION_WIDEVINEPSSHDATA']._serialized_start=4105
-  _globals['_LICENSEREQUEST_CONTENTIDENTIFICATION_WIDEVINEPSSHDATA']._serialized_end=4215
-  _globals['_LICENSEREQUEST_CONTENTIDENTIFICATION_WEBMKEYID']._serialized_start=4217
-  _globals['_LICENSEREQUEST_CONTENTIDENTIFICATION_WEBMKEYID']._serialized_end=4317
-  _globals['_LICENSEREQUEST_CONTENTIDENTIFICATION_EXISTINGLICENSE']._serialized_start=4320
-  _globals['_LICENSEREQUEST_CONTENTIDENTIFICATION_EXISTINGLICENSE']._serialized_end=4499
-  _globals['_LICENSEREQUEST_CONTENTIDENTIFICATION_INITDATA']._serialized_start=4502
-  _globals['_LICENSEREQUEST_CONTENTIDENTIFICATION_INITDATA']._serialized_end=4748
-  _globals['_LICENSEREQUEST_CONTENTIDENTIFICATION_INITDATA_INITDATATYPE']._serialized_start=4714
-  _globals['_LICENSEREQUEST_CONTENTIDENTIFICATION_INITDATA_INITDATATYPE']._serialized_end=4748
-  _globals['_LICENSEREQUEST_REQUESTTYPE']._serialized_start=4772
-  _globals['_LICENSEREQUEST_REQUESTTYPE']._serialized_end=4820
-  _globals['_METRICDATA']._serialized_start=4823
-  _globals['_METRICDATA']._serialized_end=5044
-  _globals['_METRICDATA_TYPEVALUE']._serialized_start=4918
-  _globals['_METRICDATA_TYPEVALUE']._serialized_end=5002
-  _globals['_METRICDATA_METRICTYPE']._serialized_start=5004
-  _globals['_METRICDATA_METRICTYPE']._serialized_end=5044
-  _globals['_VERSIONINFO']._serialized_start=5046
-  _globals['_VERSIONINFO']._serialized_end=5121
-  _globals['_SIGNEDMESSAGE']._serialized_start=5124
-  _globals['_SIGNEDMESSAGE']._serialized_end=5838
-  _globals['_SIGNEDMESSAGE_MESSAGETYPE']._serialized_start=5517
-  _globals['_SIGNEDMESSAGE_MESSAGETYPE']._serialized_end=5753
-  _globals['_SIGNEDMESSAGE_SESSIONKEYTYPE']._serialized_start=5755
-  _globals['_SIGNEDMESSAGE_SESSIONKEYTYPE']._serialized_end=5838
-  _globals['_CLIENTIDENTIFICATION']._serialized_start=5841
-  _globals['_CLIENTIDENTIFICATION']._serialized_end=7616
-  _globals['_CLIENTIDENTIFICATION_NAMEVALUE']._serialized_start=6271
-  _globals['_CLIENTIDENTIFICATION_NAMEVALUE']._serialized_end=6311
-  _globals['_CLIENTIDENTIFICATION_CLIENTCAPABILITIES']._serialized_start=6314
-  _globals['_CLIENTIDENTIFICATION_CLIENTCAPABILITIES']._serialized_end=7391
-  _globals['_CLIENTIDENTIFICATION_CLIENTCAPABILITIES_HDCPVERSION']._serialized_start=7012
-  _globals['_CLIENTIDENTIFICATION_CLIENTCAPABILITIES_HDCPVERSION']._serialized_end=7140
-  _globals['_CLIENTIDENTIFICATION_CLIENTCAPABILITIES_CERTIFICATEKEYTYPE']._serialized_start=7142
-  _globals['_CLIENTIDENTIFICATION_CLIENTCAPABILITIES_CERTIFICATEKEYTYPE']._serialized_end=7247
-  _globals['_CLIENTIDENTIFICATION_CLIENTCAPABILITIES_ANALOGOUTPUTCAPABILITIES']._serialized_start=7250
-  _globals['_CLIENTIDENTIFICATION_CLIENTCAPABILITIES_ANALOGOUTPUTCAPABILITIES']._serialized_end=7391
-  _globals['_CLIENTIDENTIFICATION_CLIENTCREDENTIALS']._serialized_start=7393
-  _globals['_CLIENTIDENTIFICATION_CLIENTCREDENTIALS']._serialized_end=7499
-  _globals['_CLIENTIDENTIFICATION_TOKENTYPE']._serialized_start=7501
-  _globals['_CLIENTIDENTIFICATION_TOKENTYPE']._serialized_end=7616
-  _globals['_ENCRYPTEDCLIENTIDENTIFICATION']._serialized_start=7619
-  _globals['_ENCRYPTEDCLIENTIDENTIFICATION']._serialized_end=7806
-  _globals['_DRMCERTIFICATE']._serialized_start=7809
-  _globals['_DRMCERTIFICATE']._serialized_end=8708
-  _globals['_DRMCERTIFICATE_ENCRYPTIONKEY']._serialized_start=8288
-  _globals['_DRMCERTIFICATE_ENCRYPTIONKEY']._serialized_end=8391
-  _globals['_DRMCERTIFICATE_TYPE']._serialized_start=8393
-  _globals['_DRMCERTIFICATE_TYPE']._serialized_end=8469
-  _globals['_DRMCERTIFICATE_SERVICETYPE']._serialized_start=8472
-  _globals['_DRMCERTIFICATE_SERVICETYPE']._serialized_end=8606
-  _globals['_DRMCERTIFICATE_ALGORITHM']._serialized_start=8608
-  _globals['_DRMCERTIFICATE_ALGORITHM']._serialized_end=8708
-  _globals['_SIGNEDDRMCERTIFICATE']._serialized_start=8711
-  _globals['_SIGNEDDRMCERTIFICATE']._serialized_end=8895
-  _globals['_WIDEVINEPSSHDATA']._serialized_start=8898
-  _globals['_WIDEVINEPSSHDATA']._serialized_end=9623
-  _globals['_WIDEVINEPSSHDATA_ENTITLEDKEY']._serialized_start=9404
-  _globals['_WIDEVINEPSSHDATA_ENTITLEDKEY']._serialized_end=9526
-  _globals['_WIDEVINEPSSHDATA_TYPE']._serialized_start=9528
-  _globals['_WIDEVINEPSSHDATA_TYPE']._serialized_end=9581
-  _globals['_WIDEVINEPSSHDATA_ALGORITHM']._serialized_start=9583
-  _globals['_WIDEVINEPSSHDATA_ALGORITHM']._serialized_end=9623
-  _globals['_FILEHASHES']._serialized_start=9626
-  _globals['_FILEHASHES']._serialized_end=9824
-  _globals['_FILEHASHES_SIGNATURE']._serialized_start=9716
-  _globals['_FILEHASHES_SIGNATURE']._serialized_end=9824
+    def sort(self, *args, **kwargs):
+        super().sort(*args, **kwargs)
+        self._changed()
+
+    def __iadd__(self, values):
+        result = super().__iadd__(values)
+        self._changed()
+        return result
+
+def _encode_varint(value):
+    value = int(value)
+    if value < 0:
+        value &= (1 << 64) - 1
+    out = bytearray()
+    while True:
+        byte = value & 0x7F
+        value >>= 7
+        if value:
+            out.append(byte | 0x80)
+        else:
+            out.append(byte)
+            return bytes(out)
+
+def _decode_varint(data, offset):
+    value = 0
+    shift = 0
+    start = offset
+    while offset < len(data) and shift < 70:
+        byte = data[offset]
+        offset += 1
+        value |= (byte & 0x7F) << shift
+        if not (byte & 0x80):
+            return value, offset
+        shift += 7
+    raise DecodeError(f"Invalid varint at offset {start}")
+
+def _wire_key(number, wire_type):
+    return _encode_varint((number << 3) | wire_type)
+
+def _field(number, kind, repeated=False, message=None, enum=None, default=None):
+    return _FieldSpec(number, kind, repeated, message, enum, default)
+
+class _ProtoMessage:
+    _schema = {}
+
+    def __init__(self, **kwargs):
+        object.__setattr__(self, "_initializing", True)
+        object.__setattr__(self, "_present_fields", set())
+        object.__setattr__(self, "_unknown_fields", [])
+        object.__setattr__(self, "_original_bytes", None)
+        object.__setattr__(self, "_dirty", False)
+        self._set_defaults()
+        for name, value in kwargs.items():
+            if name not in self._schema:
+                raise TypeError(f"Unknown field {name!r} for {self.__class__.__name__}")
+            self._assign_field(name, value, present=True, dirty=False)
+        object.__setattr__(self, "_initializing", False)
+        if kwargs:
+            object.__setattr__(self, "_dirty", True)
+
+    def _set_defaults(self):
+        for name, spec in self._schema.items():
+            if spec.repeated:
+                value = _TrackedList(callback=self._mark_dirty)
+            elif spec.kind == "msg":
+                value = None
+            elif spec.default is not None:
+                value = spec.default
+            elif spec.kind == "bytes":
+                value = b""
+            elif spec.kind == "string":
+                value = ""
+            elif spec.kind == "bool":
+                value = False
+            else:
+                value = 0
+            object.__setattr__(self, name, value)
+
+    def _reset(self):
+        object.__setattr__(self, "_initializing", True)
+        object.__setattr__(self, "_present_fields", set())
+        object.__setattr__(self, "_unknown_fields", [])
+        object.__setattr__(self, "_original_bytes", None)
+        object.__setattr__(self, "_dirty", False)
+        self._set_defaults()
+        object.__setattr__(self, "_initializing", False)
+
+    def _mark_dirty(self):
+        if not getattr(self, "_initializing", False):
+            object.__setattr__(self, "_dirty", True)
+
+    def _normalize_value(self, spec, value):
+        if spec.kind == "enum":
+            if isinstance(value, str):
+                return spec.enum.Value(value)
+            return int(value)
+        if spec.kind in ("uint", "int"):
+            return int(value)
+        if spec.kind == "bool":
+            return bool(value)
+        if spec.kind == "bytes":
+            if isinstance(value, bytearray):
+                return bytes(value)
+            if not isinstance(value, bytes):
+                raise TypeError(f"Expected bytes, got {type(value).__name__}")
+            return value
+        if spec.kind == "string":
+            if not isinstance(value, str):
+                value = str(value)
+            return value
+        if spec.kind == "msg":
+            if value is None:
+                return spec.message()
+            if isinstance(value, spec.message):
+                return value
+            if isinstance(value, dict):
+                return spec.message(**value)
+            raise TypeError(f"Expected {spec.message.__name__}, got {type(value).__name__}")
+        return value
+
+    def _assign_field(self, name, value, present=True, dirty=True):
+        spec = self._schema[name]
+        if not spec.repeated and spec.kind == "msg" and value is None:
+            object.__setattr__(self, name, None)
+            self._present_fields.discard(name)
+            if dirty and not self._initializing:
+                object.__setattr__(self, "_dirty", True)
+            return
+        if spec.repeated:
+            if value is None:
+                normalized = []
+            else:
+                normalized = [self._normalize_value(_FieldSpec(spec.number, spec.kind, False, spec.message, spec.enum, spec.default), item) for item in value]
+            value = _TrackedList(normalized, callback=self._mark_dirty)
+        else:
+            value = self._normalize_value(spec, value)
+        object.__setattr__(self, name, value)
+        if present:
+            self._present_fields.add(name)
+        else:
+            self._present_fields.discard(name)
+        if dirty and not self._initializing:
+            object.__setattr__(self, "_dirty", True)
+
+    def __getattribute__(self, name):
+        if not name.startswith("_"):
+            schema = object.__getattribute__(self, "_schema")
+            spec = schema.get(name)
+            if spec is not None and not spec.repeated and spec.kind == "msg":
+                value = object.__getattribute__(self, name)
+                if value is None:
+                    value = spec.message()
+                    object.__setattr__(self, name, value)
+                return value
+        return object.__getattribute__(self, name)
+
+    def __setattr__(self, name, value):
+        if name in getattr(self, "_schema", {}):
+            self._assign_field(name, value, present=True, dirty=True)
+        else:
+            object.__setattr__(self, name, value)
+
+    @staticmethod
+    def _expected_wire(spec):
+        if spec.kind in ("uint", "int", "bool", "enum"):
+            return 0
+        return 2
+
+    def ParseFromString(self, data):
+        if not isinstance(data, (bytes, bytearray, memoryview)):
+            raise TypeError("ParseFromString expects bytes-like input")
+        data = bytes(data)
+        self._reset()
+        object.__setattr__(self, "_initializing", True)
+        by_number = {spec.number: (name, spec) for name, spec in self._schema.items()}
+        offset = 0
+        while offset < len(data):
+            start = offset
+            key, offset = _decode_varint(data, offset)
+            number = key >> 3
+            wire_type = key & 7
+            if number == 0:
+                raise DecodeError("Invalid field number 0")
+            if wire_type == 0:
+                raw_value, offset = _decode_varint(data, offset)
+                payload = raw_value
+            elif wire_type == 1:
+                if offset + 8 > len(data):
+                    raise DecodeError("Truncated fixed64 field")
+                payload = data[offset:offset + 8]
+                offset += 8
+            elif wire_type == 2:
+                length, offset = _decode_varint(data, offset)
+                end = offset + length
+                if end > len(data):
+                    raise DecodeError("Truncated length-delimited field")
+                payload = data[offset:end]
+                offset = end
+            elif wire_type == 5:
+                if offset + 4 > len(data):
+                    raise DecodeError("Truncated fixed32 field")
+                payload = data[offset:offset + 4]
+                offset += 4
+            else:
+                raise DecodeError(f"Unsupported wire type {wire_type}")
+            raw_chunk = data[start:offset]
+            match = by_number.get(number)
+            if not match:
+                self._unknown_fields.append(raw_chunk)
+                continue
+            name, spec = match
+            expected = self._expected_wire(spec)
+            if spec.repeated and expected == 0 and wire_type == 2:
+                packed_offset = 0
+                values = []
+                while packed_offset < len(payload):
+                    item, packed_offset = _decode_varint(payload, packed_offset)
+                    values.append(item)
+                target = getattr(self, name)
+                target.extend(self._decode_scalar(spec, item) for item in values)
+                self._present_fields.add(name)
+                continue
+            if wire_type != expected:
+                raise DecodeError(f"Wire type mismatch for {self.__class__.__name__}.{name}")
+            value = self._decode_payload(spec, payload)
+            if spec.repeated:
+                getattr(self, name).append(value)
+                self._present_fields.add(name)
+            else:
+                object.__setattr__(self, name, value)
+                self._present_fields.add(name)
+        object.__setattr__(self, "_initializing", False)
+        object.__setattr__(self, "_original_bytes", data)
+        object.__setattr__(self, "_dirty", False)
+        return None
+
+    def _decode_scalar(self, spec, payload):
+        if spec.kind == "bool":
+            return bool(payload)
+        if spec.kind in ("uint", "int", "enum"):
+            return int(payload)
+        return payload
+
+    def _decode_payload(self, spec, payload):
+        if spec.kind in ("uint", "int", "bool", "enum"):
+            return self._decode_scalar(spec, payload)
+        if spec.kind == "bytes":
+            return bytes(payload)
+        if spec.kind == "string":
+            try:
+                return bytes(payload).decode("utf-8")
+            except UnicodeDecodeError as exc:
+                raise DecodeError(f"Invalid UTF-8 in string field: {exc}") from exc
+        if spec.kind == "msg":
+            value = spec.message()
+            value.ParseFromString(payload)
+            return value
+        raise DecodeError(f"Unsupported field kind {spec.kind}")
+
+    def _has_nested_changes(self):
+        for name, spec in self._schema.items():
+            if name not in self._present_fields:
+                continue
+            value = getattr(self, name)
+            if spec.kind == "msg":
+                if spec.repeated:
+                    if any(item._dirty or item._has_nested_changes() for item in value):
+                        return True
+                elif value._dirty or value._has_nested_changes():
+                    return True
+        return False
+
+    def SerializeToString(self):
+        if self._original_bytes is not None and not self._dirty and not self._has_nested_changes():
+            return self._original_bytes
+        out = bytearray()
+        ordered = sorted(self._schema.items(), key=lambda item: item[1].number)
+        for name, spec in ordered:
+            if name not in self._present_fields:
+                continue
+            value = getattr(self, name)
+            values = value if spec.repeated else [value]
+            for item in values:
+                out.extend(self._encode_field(spec, item))
+        for raw in self._unknown_fields:
+            out.extend(raw)
+        return bytes(out)
+
+    def _encode_field(self, spec, value):
+        if spec.kind in ("uint", "int", "bool", "enum"):
+            return _wire_key(spec.number, 0) + _encode_varint(int(value))
+        if spec.kind == "bytes":
+            payload = bytes(value)
+        elif spec.kind == "string":
+            payload = str(value).encode("utf-8")
+        elif spec.kind == "msg":
+            payload = value.SerializeToString()
+        else:
+            raise TypeError(f"Unsupported field kind {spec.kind}")
+        return _wire_key(spec.number, 2) + _encode_varint(len(payload)) + payload
+
+    def CopyFrom(self, other):
+        if not isinstance(other, self.__class__):
+            raise TypeError(f"Expected {self.__class__.__name__}")
+        self.ParseFromString(other.SerializeToString())
+
+    def HasField(self, name):
+        if name not in self._schema:
+            raise ValueError(f"Unknown field {name}")
+        return name in self._present_fields
+
+    def ListFields(self):
+        items = []
+        for name, spec in sorted(self._schema.items(), key=lambda item: item[1].number):
+            if name not in self._present_fields:
+                continue
+            value = getattr(self, name)
+            if spec.repeated and not value:
+                continue
+            items.append((_FieldDescriptor(name), value))
+        return items
+
+    def to_dict(self):
+        result = {}
+        for name, spec in sorted(self._schema.items(), key=lambda item: item[1].number):
+            if name not in self._present_fields:
+                continue
+            value = getattr(self, name)
+            if spec.repeated:
+                result[name] = [self._dict_value(spec, item) for item in value]
+            else:
+                result[name] = self._dict_value(spec, value)
+        return result
+
+    def _dict_value(self, spec, value):
+        if spec.kind == "msg":
+            return value.to_dict()
+        if spec.kind == "enum":
+            try:
+                return spec.enum.Name(value)
+            except ValueError:
+                return value
+        if spec.kind == "bytes":
+            return base64.b64encode(value).decode()
+        return value
+
+    def __repr__(self):
+        fields = ", ".join(f"{name}={getattr(self, name)!r}" for name in self._present_fields)
+        return f"{self.__class__.__name__}({fields})"
+
+def _message_to_dict(message):
+    if not isinstance(message, _ProtoMessage):
+        raise TypeError(f"Unsupported message type: {type(message).__name__}")
+    return message.to_dict()
+
+def _license_type_enum() -> _EnumMap:
+    return _EnumMap({"STREAMING": 1, "OFFLINE": 2, "AUTOMATIC": 3})
+
+
+def _platform_verification_status_enum() -> _EnumMap:
+    return _EnumMap({
+        "PLATFORM_UNVERIFIED": 0,
+        "PLATFORM_TAMPERED": 1,
+        "PLATFORM_SOFTWARE_VERIFIED": 2,
+        "PLATFORM_HARDWARE_VERIFIED": 3,
+        "PLATFORM_NO_VERIFICATION": 4,
+        "PLATFORM_SECURE_STORAGE_SOFTWARE_VERIFIED": 5,
+    })
+
+
+def _protocol_version_enum() -> _EnumMap:
+    return _EnumMap({"VERSION_2_0": 20, "VERSION_2_1": 21, "VERSION_2_2": 22})
+
+
+def _hash_algorithm_enum() -> _EnumMap:
+    return _EnumMap({
+        "HASH_ALGORITHM_UNSPECIFIED": 0,
+        "HASH_ALGORITHM_SHA_1": 1,
+        "HASH_ALGORITHM_SHA_256": 2,
+        "HASH_ALGORITHM_SHA_384": 3,
+    })
+
+
+def _key_type_enum() -> _EnumMap:
+    return _EnumMap({
+        "SIGNING": 1,
+        "CONTENT": 2,
+        "KEY_CONTROL": 3,
+        "OPERATOR_SESSION": 4,
+        "ENTITLEMENT": 5,
+        "OEM_CONTENT": 6,
+    })
+
+
+def _security_level_enum() -> _EnumMap:
+    return _EnumMap({
+        "SW_SECURE_CRYPTO": 1,
+        "SW_SECURE_DECODE": 2,
+        "HW_SECURE_CRYPTO": 3,
+        "HW_SECURE_DECODE": 4,
+        "HW_SECURE_ALL": 5,
+    })
+
+
+def _request_type_enum() -> _EnumMap:
+    return _EnumMap({"NEW": 1, "RENEWAL": 2, "RELEASE": 3})
+
+
+def _message_type_enum() -> _EnumMap:
+    return _EnumMap({
+        "LICENSE_REQUEST": 1,
+        "LICENSE": 2,
+        "ERROR_RESPONSE": 3,
+        "SERVICE_CERTIFICATE_REQUEST": 4,
+        "SERVICE_CERTIFICATE": 5,
+        "SUB_LICENSE": 6,
+        "CAS_LICENSE_REQUEST": 7,
+        "CAS_LICENSE": 8,
+        "EXTERNAL_LICENSE_REQUEST": 9,
+        "EXTERNAL_LICENSE": 10,
+    })
+
+
+def _session_key_type_enum() -> _EnumMap:
+    return _EnumMap({"UNDEFINED": 0, "WRAPPED_AES_KEY": 1, "EPHERMERAL_ECC_PUBLIC_KEY": 2})
+
+
+def _token_type_enum() -> _EnumMap:
+    return _EnumMap({
+        "KEYBOX": 0,
+        "DRM_DEVICE_CERTIFICATE": 1,
+        "REMOTE_ATTESTATION_CERTIFICATE": 2,
+        "OEM_DEVICE_CERTIFICATE": 3,
+    })
+
+
+def _hdcp_version_enum() -> _EnumMap:
+    return _EnumMap({
+        "HDCP_NONE": 0,
+        "HDCP_V1": 1,
+        "HDCP_V2": 2,
+        "HDCP_V2_1": 3,
+        "HDCP_V2_2": 4,
+        "HDCP_V2_3": 5,
+        "HDCP_NO_DIGITAL_OUTPUT": 255,
+    })
+
+
+def _certificate_key_type_enum() -> _EnumMap:
+    return _EnumMap({
+        "RSA_2048": 0,
+        "RSA_3072": 1,
+        "ECC_SECP256R1": 2,
+        "ECC_SECP384R1": 3,
+        "ECC_SECP521R1": 4,
+    })
+
+
+def _analog_output_capabilities_enum() -> _EnumMap:
+    return _EnumMap({
+        "ANALOG_OUTPUT_UNKNOWN": 0,
+        "ANALOG_OUTPUT_NONE": 1,
+        "ANALOG_OUTPUT_SUPPORTED": 2,
+        "ANALOG_OUTPUT_SUPPORTS_CGMS_A": 3,
+    })
+
+
+def _drm_certificate_type_enum() -> _EnumMap:
+    return _EnumMap({"ROOT": 0, "DEVICE_MODEL": 1, "DEVICE": 2, "SERVICE": 3, "PROVISIONER": 4})
+
+
+def _drm_service_type_enum() -> _EnumMap:
+    return _EnumMap({
+        "UNKNOWN_SERVICE_TYPE": 0,
+        "LICENSE_SERVER_SDK": 1,
+        "LICENSE_SERVER_PROXY_SDK": 2,
+        "PROVISIONING_SDK": 3,
+        "CAS_PROXY_SDK": 4,
+    })
+
+
+def _drm_algorithm_enum() -> _EnumMap:
+    return _EnumMap({
+        "UNKNOWN_ALGORITHM": 0,
+        "RSA": 1,
+        "ECC_SECP256R1": 2,
+        "ECC_SECP384R1": 3,
+        "ECC_SECP521R1": 4,
+    })
+
+
+def _widevine_pssh_type_enum() -> _EnumMap:
+    return _EnumMap({"SINGLE": 0, "ENTITLEMENT": 1, "ENTITLED_KEY": 2})
+
+
+def _widevine_pssh_algorithm_enum() -> _EnumMap:
+    return _EnumMap({"UNENCRYPTED": 0, "AESCTR": 1})
+
+class LicenseIdentification(_ProtoMessage):
+    pass
+
+LicenseIdentification._schema = {
+    "request_id": _field(1, "bytes"),
+    "session_id": _field(2, "bytes"),
+    "purchase_id": _field(3, "bytes"),
+    "type": _field(4, "enum", enum=_license_type_enum(), default=1),
+    "version": _field(5, "int"),
+    "provider_session_token": _field(6, "bytes"),
+}
+
+
+class OperatorSessionKeyPermissions(_ProtoMessage):
+    pass
+
+OperatorSessionKeyPermissions._schema = {
+    "allow_encrypt": _field(1, "bool"),
+    "allow_decrypt": _field(2, "bool"),
+    "allow_sign": _field(3, "bool"),
+    "allow_signature_verify": _field(4, "bool"),
+}
+
+
+class LicenseKeyContainer(_ProtoMessage):
+    pass
+
+LicenseKeyContainer.KeyType = _key_type_enum()
+LicenseKeyContainer.SecurityLevel = _security_level_enum()
+LicenseKeyContainer._schema = {
+    "id": _field(1, "bytes"),
+    "iv": _field(2, "bytes"),
+    "key": _field(3, "bytes"),
+    "type": _field(4, "enum", enum=LicenseKeyContainer.KeyType, default=1),
+    "level": _field(5, "enum", enum=LicenseKeyContainer.SecurityLevel, default=1),
+    "operator_session_key_permissions": _field(9, "msg", message=OperatorSessionKeyPermissions),
+    "anti_rollback_usage_table": _field(11, "bool"),
+    "track_label": _field(12, "string"),
+}
+
+
+class License(_ProtoMessage):
+    pass
+
+License._schema = {
+    "id": _field(1, "msg", message=LicenseIdentification),
+    "key": _field(3, "msg", repeated=True, message=LicenseKeyContainer),
+    "license_start_time": _field(4, "int"),
+    "remote_attestation_verified": _field(5, "bool"),
+    "provider_client_token": _field(6, "bytes"),
+    "protection_scheme": _field(7, "uint"),
+    "srm_requirement": _field(8, "bytes"),
+    "srm_update": _field(9, "bytes"),
+    "platform_verification_status": _field(10, "enum", enum=_platform_verification_status_enum(), default=4),
+    "group_ids": _field(11, "bytes", repeated=True),
+}
+License.KeyContainer = LicenseKeyContainer
+
+
+class LicenseRequestWidevinePsshData(_ProtoMessage):
+    pass
+
+LicenseRequestWidevinePsshData._schema = {
+    "pssh_data": _field(1, "bytes", repeated=True),
+    "license_type": _field(2, "enum", enum=_license_type_enum(), default=1),
+    "request_id": _field(3, "bytes"),
+}
+
+
+class LicenseRequestContentIdentification(_ProtoMessage):
+    pass
+
+LicenseRequestContentIdentification._schema = {
+    "widevine_pssh_data": _field(1, "msg", message=LicenseRequestWidevinePsshData),
+}
+LicenseRequestContentIdentification.WidevinePsshData = LicenseRequestWidevinePsshData
+
+
+class EncryptedClientIdentification(_ProtoMessage):
+    pass
+
+EncryptedClientIdentification._schema = {
+    "provider_id": _field(1, "string"),
+    "service_certificate_serial_number": _field(2, "bytes"),
+    "encrypted_client_id": _field(3, "bytes"),
+    "encrypted_client_id_iv": _field(4, "bytes"),
+    "encrypted_privacy_key": _field(5, "bytes"),
+}
+
+
+class LicenseRequest(_ProtoMessage):
+    pass
+
+LicenseRequest.RequestType = _request_type_enum()
+LicenseRequest.ContentIdentification = LicenseRequestContentIdentification
+
+
+class SignedMessage(_ProtoMessage):
+    pass
+
+SignedMessage.MessageType = _message_type_enum()
+SignedMessage.SessionKeyType = _session_key_type_enum()
+SignedMessage._schema = {
+    "type": _field(1, "enum", enum=SignedMessage.MessageType),
+    "msg": _field(2, "bytes"),
+    "signature": _field(3, "bytes"),
+    "session_key": _field(4, "bytes"),
+    "remote_attestation": _field(5, "bytes"),
+    "session_key_type": _field(8, "enum", enum=SignedMessage.SessionKeyType, default=1),
+    "oemcrypto_core_message": _field(9, "bytes"),
+}
+
+
+class ClientNameValue(_ProtoMessage):
+    pass
+
+ClientNameValue._schema = {
+    "name": _field(1, "string"),
+    "value": _field(2, "string"),
+}
+
+
+class ClientCapabilities(_ProtoMessage):
+    pass
+
+ClientCapabilities.HdcpVersion = _hdcp_version_enum()
+ClientCapabilities.CertificateKeyType = _certificate_key_type_enum()
+ClientCapabilities.AnalogOutputCapabilities = _analog_output_capabilities_enum()
+ClientCapabilities._schema = {
+    "client_token": _field(1, "bool"),
+    "session_token": _field(2, "bool"),
+    "video_resolution_constraints": _field(3, "bool"),
+    "max_hdcp_version": _field(4, "enum", enum=ClientCapabilities.HdcpVersion),
+    "oem_crypto_api_version": _field(5, "uint"),
+    "anti_rollback_usage_table": _field(6, "bool"),
+    "srm_version": _field(7, "uint"),
+    "can_update_srm": _field(8, "bool"),
+    "supported_certificate_key_type": _field(9, "enum", repeated=True, enum=ClientCapabilities.CertificateKeyType),
+    "analog_output_capabilities": _field(10, "enum", enum=ClientCapabilities.AnalogOutputCapabilities),
+    "can_disable_analog_output": _field(11, "bool"),
+    "resource_rating_tier": _field(12, "uint"),
+}
+
+
+class ClientCredentials(_ProtoMessage):
+    pass
+
+ClientCredentials.TokenType = _token_type_enum()
+ClientCredentials._schema = {
+    "type": _field(1, "enum", enum=ClientCredentials.TokenType),
+    "token": _field(2, "bytes"),
+}
+
+
+class ClientIdentification(_ProtoMessage):
+    pass
+
+ClientIdentification.TokenType = _token_type_enum()
+ClientIdentification.NameValue = ClientNameValue
+ClientIdentification.ClientCapabilities = ClientCapabilities
+ClientIdentification.ClientCredentials = ClientCredentials
+ClientIdentification._schema = {
+    "type": _field(1, "enum", enum=ClientIdentification.TokenType),
+    "token": _field(2, "bytes"),
+    "client_info": _field(3, "msg", repeated=True, message=ClientNameValue),
+    "provider_client_token": _field(4, "bytes"),
+    "license_counter": _field(5, "uint"),
+    "client_capabilities": _field(6, "msg", message=ClientCapabilities),
+    "vmp_data": _field(7, "bytes"),
+    "device_credentials": _field(8, "msg", repeated=True, message=ClientCredentials),
+}
+
+
+class DrmEncryptionKey(_ProtoMessage):
+    pass
+
+DrmEncryptionKey.Algorithm = _drm_algorithm_enum()
+DrmEncryptionKey._schema = {
+    "public_key": _field(1, "bytes"),
+    "algorithm": _field(2, "enum", enum=DrmEncryptionKey.Algorithm, default=1),
+}
+
+
+class DrmCertificate(_ProtoMessage):
+    pass
+
+DrmCertificate.Type = _drm_certificate_type_enum()
+DrmCertificate.ServiceType = _drm_service_type_enum()
+DrmCertificate.Algorithm = _drm_algorithm_enum()
+DrmCertificate.EncryptionKey = DrmEncryptionKey
+DrmCertificate._schema = {
+    "type": _field(1, "enum", enum=DrmCertificate.Type),
+    "serial_number": _field(2, "bytes"),
+    "creation_time_seconds": _field(3, "uint"),
+    "public_key": _field(4, "bytes"),
+    "system_id": _field(5, "uint"),
+    "test_device_deprecated": _field(6, "bool"),
+    "provider_id": _field(7, "string"),
+    "service_types": _field(8, "enum", repeated=True, enum=DrmCertificate.ServiceType),
+    "algorithm": _field(9, "enum", enum=DrmCertificate.Algorithm, default=1),
+    "rot_id": _field(10, "bytes"),
+    "encryption_key": _field(11, "msg", message=DrmEncryptionKey),
+    "expiration_time_seconds": _field(12, "uint"),
+}
+
+
+class SignedDrmCertificate(_ProtoMessage):
+    pass
+
+
+class WidevineEntitledKey(_ProtoMessage):
+    pass
+
+WidevineEntitledKey._schema = {
+    "entitlement_key_id": _field(1, "bytes"),
+    "key_id": _field(2, "bytes"),
+    "key": _field(3, "bytes"),
+    "iv": _field(4, "bytes"),
+    "entitlement_key_size_bytes": _field(5, "uint", default=32),
+}
+
+
+class WidevinePsshData(_ProtoMessage):
+    pass
+
+WidevinePsshData.Type = _widevine_pssh_type_enum()
+WidevinePsshData.Algorithm = _widevine_pssh_algorithm_enum()
+WidevinePsshData.EntitledKey = WidevineEntitledKey
+WidevinePsshData._schema = {
+    "algorithm": _field(1, "enum", enum=WidevinePsshData.Algorithm),
+    "key_ids": _field(2, "bytes", repeated=True),
+    "provider": _field(3, "string"),
+    "content_id": _field(4, "bytes"),
+    "track_type": _field(5, "string"),
+    "policy": _field(6, "string"),
+    "crypto_period_index": _field(7, "uint"),
+    "grouped_license": _field(8, "bytes"),
+    "protection_scheme": _field(9, "uint"),
+    "crypto_period_seconds": _field(10, "uint"),
+    "type": _field(11, "enum", enum=WidevinePsshData.Type),
+    "key_sequence": _field(12, "uint"),
+    "group_ids": _field(13, "bytes", repeated=True),
+    "entitled_keys": _field(14, "msg", repeated=True, message=WidevineEntitledKey),
+    "video_feature": _field(15, "string"),
+}
+
+
+class FileHashSignature(_ProtoMessage):
+    pass
+
+FileHashSignature._schema = {
+    "filename": _field(1, "string"),
+    "test_signing": _field(2, "bool"),
+    "SHA512Hash": _field(3, "bytes"),
+    "main_exe": _field(4, "bool"),
+    "signature": _field(5, "bytes"),
+}
+
+
+class FileHashes(_ProtoMessage):
+    pass
+
+FileHashes.Signature = FileHashSignature
+FileHashes._schema = {
+    "signer": _field(1, "bytes"),
+    "signatures": _field(2, "msg", repeated=True, message=FileHashSignature),
+}
+
+SignedDrmCertificate._schema = {
+    "drm_certificate": _field(1, "bytes"),
+    "signature": _field(2, "bytes"),
+    "signer": _field(3, "msg", message=SignedDrmCertificate),
+    "hash_algorithm": _field(4, "enum", enum=_hash_algorithm_enum()),
+}
+
+LicenseRequest._schema = {
+    "client_id": _field(1, "msg", message=ClientIdentification),
+    "content_id": _field(2, "msg", message=LicenseRequestContentIdentification),
+    "type": _field(3, "enum", enum=LicenseRequest.RequestType),
+    "request_time": _field(4, "int"),
+    "key_control_nonce_deprecated": _field(5, "bytes"),
+    "protocol_version": _field(6, "enum", enum=_protocol_version_enum(), default=20),
+    "key_control_nonce": _field(7, "uint"),
+    "encrypted_client_id": _field(8, "msg", message=EncryptedClientIdentification),
+}
 
 class Exception(Exception):
     """Exceptions used by ."""
@@ -280,53 +1015,125 @@ class DeviceTypes(Enum):
     CHROME = 1
     ANDROID = 2
 
+class _WVDRecord(dict):
+    def __getattr__(self, name):
+        try:
+            return self[name]
+        except KeyError as exc:
+            raise AttributeError(name) from exc
+
+    def __setattr__(self, name, value):
+        self[name] = value
+
+
+class _WVDHeaderStructure:
+    @staticmethod
+    def parse(data):
+        data = bytes(data)
+        if len(data) < 4 or data[:3] != b"WVD":
+            raise ValueError("Device Data does not seem to be a WVD file.")
+        return _WVDRecord(signature=b"WVD", version=data[3])
+
+
+class _WVDStructure:
+    def __init__(self, version):
+        self.version = int(version)
+
+    @staticmethod
+    def _read_u16(data, offset):
+        if offset + 2 > len(data):
+            raise ValueError("Truncated WVD length field.")
+        return int.from_bytes(data[offset:offset + 2], "big"), offset + 2
+
+    def parse(self, data):
+        data = bytes(data)
+        if len(data) < 9 or data[:3] != b"WVD":
+            raise ValueError("Invalid or truncated WVD data.")
+        version = data[3]
+        if version != self.version:
+            raise ValueError(f"Expected WVD v{self.version}, got v{version}.")
+        try:
+            type_ = DeviceTypes(data[4])
+        except ValueError as exc:
+            raise ValueError(f"Unknown WVD device type: {data[4]}") from exc
+        security_level = data[5]
+        flag_byte = data[6]
+        offset = 7
+        private_key_len, offset = self._read_u16(data, offset)
+        end = offset + private_key_len
+        if end > len(data):
+            raise ValueError("Truncated WVD private key.")
+        private_key = data[offset:end]
+        offset = end
+        client_id_len, offset = self._read_u16(data, offset)
+        end = offset + client_id_len
+        if end > len(data):
+            raise ValueError("Truncated WVD client ID.")
+        client_id = data[offset:end]
+        offset = end
+        record = _WVDRecord(
+            signature=b"WVD",
+            version=version,
+            type_=type_,
+            security_level=security_level,
+            flags={} if flag_byte == 0 else {"raw": flag_byte},
+            private_key_len=private_key_len,
+            private_key=private_key,
+            client_id_len=client_id_len,
+            client_id=client_id,
+        )
+        if version == 1:
+            vmp_len, offset = self._read_u16(data, offset)
+            end = offset + vmp_len
+            if end > len(data):
+                raise ValueError("Truncated WVD VMP data.")
+            record.vmp_len = vmp_len
+            record.vmp = data[offset:end]
+            offset = end
+        if offset != len(data):
+            raise ValueError(f"Unexpected trailing WVD data: {len(data) - offset} bytes.")
+        return record
+
+    def parse_stream(self, stream):
+        return self.parse(stream.read())
+
+    def build(self, values):
+        version = self.version
+        type_value = values.get("type_", DeviceTypes.ANDROID)
+        if isinstance(type_value, DeviceTypes):
+            type_value = type_value.value
+        elif isinstance(type_value, str):
+            type_value = DeviceTypes[type_value.upper()].value
+        type_value = int(type_value)
+        security_level = int(values.get("security_level", 3))
+        flags = values.get("flags") or {}
+        flag_byte = int(flags.get("raw", 0)) if isinstance(flags, dict) else 0
+        private_key = bytes(values.get("private_key") or b"")
+        client_id = bytes(values.get("client_id") or b"")
+        if len(private_key) > 0xFFFF or len(client_id) > 0xFFFF:
+            raise ValueError("WVD private key or client ID exceeds 65535 bytes.")
+        out = bytearray(b"WVD")
+        out.extend((version, type_value, security_level, flag_byte & 0xFF))
+        out.extend(len(private_key).to_bytes(2, "big"))
+        out.extend(private_key)
+        out.extend(len(client_id).to_bytes(2, "big"))
+        out.extend(client_id)
+        if version == 1:
+            vmp = values.get("vmp") or b""
+            if isinstance(vmp, FileHashes):
+                vmp = vmp.SerializeToString()
+            vmp = bytes(vmp)
+            if len(vmp) > 0xFFFF:
+                raise ValueError("WVD VMP exceeds 65535 bytes.")
+            out.extend(len(vmp).to_bytes(2, "big"))
+            out.extend(vmp)
+        return bytes(out)
+
+
 class _Structures:
-    magic = Const(b"WVD")
-
-    header = Struct(
-        "signature" / magic,
-        "version" / Int8ub
-    )
-
-                                                                            
-    v2 = Struct(
-        "signature" / magic,
-        "version" / Const(Int8ub, 2),
-        "type_" / CEnum(
-            Int8ub,
-            **{t.name: t.value for t in DeviceTypes}
-        ),
-        "security_level" / Int8ub,
-        "flags" / Padded(1, COptional(BitStruct(
-                                     
-            Padding(8)
-        ))),
-        "private_key_len" / Int16ub,
-        "private_key" / Bytes(this.private_key_len),
-        "client_id_len" / Int16ub,
-        "client_id" / Bytes(this.client_id_len)
-    )
-
-                                                                                     
-    v1 = Struct(
-        "signature" / magic,
-        "version" / Const(Int8ub, 1),
-        "type_" / CEnum(
-            Int8ub,
-            **{t.name: t.value for t in DeviceTypes}
-        ),
-        "security_level" / Int8ub,
-        "flags" / Padded(1, COptional(BitStruct(
-                                     
-            Padding(8)
-        ))),
-        "private_key_len" / Int16ub,
-        "private_key" / Bytes(this.private_key_len),
-        "client_id_len" / Int16ub,
-        "client_id" / Bytes(this.client_id_len),
-        "vmp_len" / Int16ub,
-        "vmp" / Bytes(this.vmp_len)
-    )
+    header = _WVDHeaderStructure()
+    v2 = _WVDStructure(2)
+    v1 = _WVDStructure(1)
 
 class Device:
     Structures = _Structures
@@ -393,14 +1200,81 @@ class Device:
             raise ValueError(f"Expecting Bytes or Base64 input, got {data!r}")
         return cls(**cls.supported_structure.parse(data))
 
+    @staticmethod
+    def _metadata_from_file_inputs(*values: Any) -> tuple[Optional[DeviceTypes], Optional[int]]:
+        directories = []
+        for value in values:
+            if value in (None, False) or isinstance(value, bytes):
+                continue
+            try:
+                path = Path(value)
+            except TypeError:
+                continue
+            parent = path if path.is_dir() else path.parent
+            if parent not in directories:
+                directories.append(parent)
+        resolved_type = None
+        resolved_level = None
+        for directory in directories:
+            metadata_path = directory / "wv.json"
+            if not metadata_path.is_file():
+                continue
+            try:
+                metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+            except Exception:
+                continue
+            level = metadata.get("security_level")
+            if resolved_level is None:
+                try:
+                    level = int(level)
+                    if level in (1, 2, 3):
+                        resolved_level = level
+                except (TypeError, ValueError):
+                    pass
+            session_type = str(metadata.get("session_id_type", "")).strip().upper()
+            if resolved_type is None and session_type in DeviceTypes.__members__:
+                resolved_type = DeviceTypes[session_type]
+        if resolved_level is None:
+            for directory in directories:
+                candidates = [directory.name]
+                for value in values:
+                    if value in (None, False) or isinstance(value, bytes):
+                        continue
+                    try:
+                        path = Path(value)
+                    except TypeError:
+                        continue
+                    if path.parent == directory:
+                        candidates.append(path.name)
+                for candidate in candidates:
+                    match = re.search(r"(?:^|[_\-.])l([123])(?:$|[_\-.])", candidate, flags=re.IGNORECASE)
+                    if match:
+                        resolved_level = int(match.group(1))
+                        break
+                if resolved_level is not None:
+                    break
+        return resolved_type, resolved_level
+
+    @staticmethod
+    def _resolve_device_type(value: Optional[Union[DeviceTypes, str]], fallback: Optional[DeviceTypes]) -> DeviceTypes:
+        if value is None:
+            return fallback or DeviceTypes.ANDROID
+        if isinstance(value, DeviceTypes):
+            return value
+        normalized = str(value).strip().upper()
+        if normalized not in DeviceTypes.__members__:
+            valid = ", ".join(DeviceTypes.__members__)
+            raise ValueError(f"Invalid device type '{value}'. Expected one of: {valid}")
+        return DeviceTypes[normalized]
+
     @classmethod
     def from_files(
         cls,
         private_key: Optional[Union[Path, str, bytes]] = None,
         client_id: Optional[Union[Path, str, bytes]] = None,
         vmp: Union[Path, str, bytes, bool, None] = False,
-        type_: Union[DeviceTypes, str] = DeviceTypes.ANDROID,
-        security_level: int = 3,
+        type_: Optional[Union[DeviceTypes, str]] = None,
+        security_level: Optional[int] = None,
         flags: Optional[dict] = None,
         certificate: Optional[Union[Path, str, bytes]] = None,
         key: Optional[Union[Path, str, bytes]] = None
@@ -411,11 +1285,19 @@ class Device:
             raise ValueError("Device private key path or bytes are required.")
         if selected_client_id is None:
             raise ValueError("Device client certificate path or bytes are required.")
+        inferred_type, inferred_level = cls._metadata_from_file_inputs(selected_private_key, selected_client_id, vmp)
+        resolved_type = cls._resolve_device_type(type_, inferred_type)
+        if security_level is None:
+            resolved_level = inferred_level if inferred_level is not None else 3
+        else:
+            resolved_level = int(security_level)
+        if resolved_level not in (1, 2, 3):
+            raise ValueError(f"Invalid security level: {resolved_level}. Expected 1, 2, or 3.")
         private_key_bytes = selected_private_key if isinstance(selected_private_key, bytes) else Path(selected_private_key).read_bytes()
         client_id_bytes = selected_client_id if isinstance(selected_client_id, bytes) else Path(selected_client_id).read_bytes()
         device = cls(
-            type_=type_,
-            security_level=security_level,
+            type_=resolved_type,
+            security_level=resolved_level,
             flags=flags,
             private_key=private_key_bytes,
             client_id=client_id_bytes
@@ -434,20 +1316,19 @@ class Device:
         return device
 
     @classmethod
-    def load_from_files(cls, private_key: Union[Path, str, bytes], client_id: Union[Path, str, bytes], vmp: Union[Path, str, bytes, bool, None] = False, type: Union[DeviceTypes, str] = DeviceTypes.ANDROID, type_: Optional[Union[DeviceTypes, str]] = None, security_level: int = 3, flags: Optional[dict] = None) -> Device:
+    def load_from_files(cls, private_key: Union[Path, str, bytes], client_id: Union[Path, str, bytes], vmp: Union[Path, str, bytes, bool, None] = False, type: Optional[Union[DeviceTypes, str]] = None, type_: Optional[Union[DeviceTypes, str]] = None, security_level: Optional[int] = None, flags: Optional[dict] = None) -> Device:
         selected_type = type_ if type_ is not None else type
-        selected_vmp = False
-        if vmp:
-            selected_vmp = vmp
-        return cls.from_files(private_key=private_key,
-                              client_id=client_id,
-                              vmp=selected_vmp,
-                              type_=selected_type,
-                              security_level=security_level,
-                              flags=flags)
+        return cls.from_files(
+            private_key=private_key,
+            client_id=client_id,
+            vmp=vmp,
+            type_=selected_type,
+            security_level=security_level,
+            flags=flags
+        )
 
     @classmethod
-    def from_directory(cls, path: Union[Path, str], type_: Union[DeviceTypes, str] = DeviceTypes.ANDROID, security_level: int = 3, flags: Optional[dict] = None) -> Device:
+    def from_directory(cls, path: Union[Path, str], type_: Optional[Union[DeviceTypes, str]] = None, security_level: Optional[int] = None, flags: Optional[dict] = None) -> Device:
         directory = Path(path)
         if not directory.exists() or not directory.is_dir():
             raise ValueError(f"Device directory does not exist: {directory}")
@@ -458,7 +1339,10 @@ class Device:
             raise FileNotFoundError(f"Missing device private key file: {private_key_path.name}")
         if not client_id_path.exists():
             raise FileNotFoundError(f"Missing device client ID blob file: {client_id_path.name}")
-        return cls.from_files(private_key=private_key_path, client_id=client_id_path, vmp=vmp_path if vmp_path.exists() else None,
+        return cls.from_files(
+            private_key=private_key_path,
+            client_id=client_id_path,
+            vmp=vmp_path if vmp_path.exists() else False,
             type_=type_,
             security_level=security_level,
             flags=flags
@@ -511,7 +1395,7 @@ class Device:
         if header.version == 1:            
             v1_struct = _Structures.v1.parse(data)
             v1_struct.version = 2                                        
-            v1_struct.flags = Container()                                             
+            v1_struct.flags = {}                                             
 
             vmp = FileHashes()
             if v1_struct.vmp:
@@ -539,27 +1423,109 @@ class Device:
 
             try:
                 data = _Structures.v2.build(v1_struct)
-            except ConstructError as e:
+            except (ValueError, TypeError) as e:
                 raise ValueError(f"Migration failed, {e}")
 
         try:
             return cls.loads(data)
-        except ConstructError as e:
+        except (ValueError, TypeError) as e:
             raise ValueError(f"Device Data seems to be corrupt or invalid, or migration failed, {e}")
 
 
 __all__ = ("Device", "DeviceTypes")
 
 
+def _parse_pssh_box(data):
+    data = bytes(data)
+    if len(data) < 32:
+        raise ValueError("PSSH box is too short.")
+    size32 = int.from_bytes(data[:4], "big")
+    if data[4:8] != b"pssh":
+        raise ValueError("Input is not a PSSH box.")
+    offset = 8
+    if size32 == 1:
+        if len(data) < 16:
+            raise ValueError("Truncated large-size PSSH box.")
+        box_size = int.from_bytes(data[8:16], "big")
+        offset = 16
+    elif size32 == 0:
+        box_size = len(data)
+    else:
+        box_size = size32
+    if box_size > len(data) or box_size < offset + 24:
+        raise ValueError("Invalid PSSH box size.")
+    version = data[offset]
+    flags = int.from_bytes(data[offset + 1:offset + 4], "big")
+    offset += 4
+    if version not in (0, 1):
+        raise ValueError(f"Unsupported PSSH version: {version}")
+    system_id = UUID(bytes=data[offset:offset + 16])
+    offset += 16
+    key_ids = []
+    if version == 1:
+        if offset + 4 > box_size:
+            raise ValueError("Truncated PSSH key count.")
+        key_count = int.from_bytes(data[offset:offset + 4], "big")
+        offset += 4
+        needed = key_count * 16
+        if offset + needed > box_size:
+            raise ValueError("Truncated PSSH key IDs.")
+        key_ids = [UUID(bytes=data[i:i + 16]) for i in range(offset, offset + needed, 16)]
+        offset += needed
+    if offset + 4 > box_size:
+        raise ValueError("Truncated PSSH init-data length.")
+    init_size = int.from_bytes(data[offset:offset + 4], "big")
+    offset += 4
+    end = offset + init_size
+    if end > box_size:
+        raise ValueError("Truncated PSSH init data.")
+    if end != box_size:
+        raise ValueError(f"Unexpected trailing data inside PSSH box: {box_size - end} bytes.")
+    return {
+        "version": version,
+        "flags": flags,
+        "system_ID": system_id,
+        "key_IDs": key_ids,
+        "init_data": data[offset:end],
+    }
+
+
+def _build_pssh_box(version, flags, system_id, key_ids, init_data):
+    version = int(version)
+    flags = int(flags)
+    if version not in (0, 1):
+        raise ValueError(f"Unsupported PSSH version: {version}")
+    if not isinstance(system_id, UUID):
+        system_id = UUID(str(system_id))
+    init_data = bytes(init_data or b"")
+    key_ids = list(key_ids or [])
+    payload = bytearray()
+    payload.append(version)
+    payload.extend((flags & 0xFFFFFF).to_bytes(3, "big"))
+    payload.extend(system_id.bytes)
+    if version == 1:
+        normalized = []
+        for key_id in key_ids:
+            normalized.append(key_id if isinstance(key_id, UUID) else UUID(str(key_id)))
+        payload.extend(len(normalized).to_bytes(4, "big"))
+        for key_id in normalized:
+            payload.extend(key_id.bytes)
+    payload.extend(len(init_data).to_bytes(4, "big"))
+    payload.extend(init_data)
+    size = 8 + len(payload)
+    if size > 0xFFFFFFFF:
+        raise ValueError("PSSH box is too large for a 32-bit MP4 box size.")
+    return size.to_bytes(4, "big") + b"pssh" + bytes(payload)
+
+
 class PSSH:
     class SystemId:
         Widevine = UUID(hex="edef8ba979d64acea3c827dcd51d21ed")
 
-    def __init__(self, data: Union[Container, str, bytes], strict: bool = False):
+    def __init__(self, data: Union[dict, str, bytes], strict: bool = False):
         if not data:
             raise ValueError("Data must not be empty.")
-
-        if isinstance(data, Container):
+        if isinstance(data, dict):
             box = data
         else:
             if isinstance(data, str):
@@ -567,40 +1533,39 @@ class PSSH:
                     data = base64.b64decode(data)
                 except (binascii.Error, binascii.Incomplete) as e:
                     raise binascii.Error(f"Could not decode data as Base64, {e}")
-
             if not isinstance(data, bytes):
-                raise TypeError(f"Expected data to be a {Container}, bytes, or base64, not {data!r}")
-
+                raise TypeError(f"Expected bytes, base64, or a PSSH mapping, not {data!r}")
             try:
-                box = Box.parse(data)
-            except (IOError, construct.ConstructError):             
+                box = _parse_pssh_box(data)
+            except (ValueError, TypeError):
                 try:
                     widevine_pssh_data = WidevinePsshData()
                     widevine_pssh_data.ParseFromString(data)
                     data_serialized = widevine_pssh_data.SerializeToString()
-                    if data_serialized != data:                                   
-                        raise DecodeError()
-                    box = Box.parse(Box.build(dict(
-                        type=b"pssh",
-                        version=0,
-                        flags=0,
-                        system_ID=PSSH.SystemId.Widevine,
-                        init_data=data_serialized
-                    )))
-                except DecodeError:                              
+                    if data_serialized != data:
+                        raise DecodeError("partial parse")
+                    box = {
+                        "version": 0,
+                        "flags": 0,
+                        "system_ID": PSSH.SystemId.Widevine,
+                        "key_IDs": [],
+                        "init_data": data_serialized,
+                    }
+                except DecodeError:
                     if strict:
-                        raise DecodeError(f"Could not parse data as a {Container} nor a {WidevinePsshData}.")
-                    else:                                               
-                        box = Box.parse(Box.build(dict(type=b"pssh",
-                                                       version=0,
-                                                       flags=0,
-                                                       system_ID=PSSH.SystemId.Widevine,
-                                                       init_data=data)))
-        self.version = box.version
-        self.flags = box.flags
-        self.system_id = box.system_ID
-        self.__key_ids = box.key_IDs
-        self.init_data = box.init_data
+                        raise DecodeError("Could not parse data as a PSSH box nor WidevinePsshData.")
+                    box = {
+                        "version": 0,
+                        "flags": 0,
+                        "system_ID": PSSH.SystemId.Widevine,
+                        "key_IDs": [],
+                        "init_data": data,
+                    }
+        self.version = int(box["version"])
+        self.flags = int(box.get("flags", 0))
+        self.system_id = box["system_ID"] if isinstance(box["system_ID"], UUID) else UUID(str(box["system_ID"]))
+        self.__key_ids = list(box.get("key_IDs") or [])
+        self.init_data = bytes(box.get("init_data") or b"")
 
     def __repr__(self) -> str:
         return f"PSSH<{self.system_id}>(v{self.version}; {self.flags}, {self.key_ids}, {self.init_data})"
@@ -617,37 +1582,22 @@ class PSSH:
         version: int = 0,
         flags: int = 0
     ) -> PSSH:
-        """Craft a new version 0 or 1 PSSH Box."""
         if not system_id:
             raise ValueError("A System ID must be specified.")
         if not isinstance(system_id, UUID):
             raise TypeError(f"Expected system_id to be a UUID, not {system_id!r}")
-
         if key_ids is not None and not isinstance(key_ids, list):
             raise TypeError(f"Expected key_ids to be a list not {key_ids!r}")
-
         if init_data is not None and not isinstance(init_data, (WidevinePsshData, str, bytes)):
-            raise TypeError(f"Expected init_data to be a {WidevinePsshData}, base64, or bytes, not {init_data!r}")
-
-        if not isinstance(version, int):
-            raise TypeError(f"Expected version to be an int not {version!r}")
-        if version not in (0, 1):
+            raise TypeError(f"Expected init_data to be WidevinePsshData, base64, hex, or bytes, not {init_data!r}")
+        if not isinstance(version, int) or version not in (0, 1):
             raise ValueError(f"Invalid version, must be either 0 or 1, not {version}.")
-
-        if not isinstance(flags, int):
-            raise TypeError(f"Expected flags to be an int not {flags!r}")
-        if flags < 0:
-            raise ValueError("Invalid flags, cannot be less than 0.")
-
+        if not isinstance(flags, int) or flags < 0:
+            raise ValueError("Invalid flags.")
         if version == 0 and key_ids is not None and init_data is not None:
-                                                                                                            
             raise ValueError("Version 0 PSSH boxes must use only init_data, not init_data and key_ids.")
-        elif version == 1:
-                                                                                                       
-                                                                             
-            if init_data is None and key_ids is None:
-                raise ValueError("Version 1 PSSH boxes must use either init_data or key_ids but neither were provided")
-
+        if version == 1 and init_data is None and key_ids is None:
+            raise ValueError("Version 1 PSSH boxes must use either init_data or key_ids.")
         if init_data is not None:
             if isinstance(init_data, WidevinePsshData):
                 init_data = init_data.SerializeToString()
@@ -656,18 +1606,10 @@ class PSSH:
                     init_data = bytes.fromhex(init_data)
                 else:
                     init_data = base64.b64decode(init_data)
-            elif not isinstance(init_data, bytes):
-                raise TypeError(
-                    f"Expecting init_data to be {WidevinePsshData}, hex, base64, or bytes, not {init_data!r}"
-                )
-
-        pssh = cls(Box.parse(Box.build(dict(type=b"pssh",
-                                            version=version,
-                                            flags=flags,
-                                            system_ID=system_id,
-                                            init_data=[init_data, b""][init_data is None]))))
-
-        if key_ids:                                                         
+        else:
+            init_data = b""
+        pssh = cls(_build_pssh_box(version, flags, system_id, [], init_data))
+        if key_ids:
             pssh.version = version
             pssh.set_key_ids(key_ids)
         return pssh
@@ -676,86 +1618,71 @@ class PSSH:
     def key_ids(self) -> list[UUID]:
         if self.version == 1 and self.__key_ids:
             return self.__key_ids
-
         if self.system_id == PSSH.SystemId.Widevine:
-                                                                                                
             cenc_header = WidevinePsshData()
             cenc_header.ParseFromString(self.init_data)
-            return [                                             
-                (
-                    UUID(bytes=key_id) if len(key_id) == 16 else          
-                    UUID(hex=key_id.decode()) if len(key_id) == 32 else                 
-                    UUID(int=int.from_bytes(key_id, "big"))                      
-                )
+            return [
+                UUID(bytes=key_id) if len(key_id) == 16 else
+                UUID(hex=key_id.decode()) if len(key_id) == 32 else
+                UUID(int=int.from_bytes(key_id, "big"))
                 for key_id in cenc_header.key_ids
             ]
-
-
         raise ValueError(f"This PSSH is not supported by key_ids() property, {self.dumps()}")
 
     def dump(self) -> bytes:
-        return Box.build(dict(
-            type=b"pssh",
-            version=self.version,
-            flags=self.flags,
-            system_ID=self.system_id,
-            key_IDs=self.key_ids if self.version == 1 and self.key_ids else None,
-            init_data=self.init_data
-        ))
+        return _build_pssh_box(
+            self.version,
+            self.flags,
+            self.system_id,
+            self.__key_ids if self.version == 1 else [],
+            self.init_data,
+        )
 
     def dumps(self) -> str:
-        """Export the PSSH object as a full PSSH box in base64 form."""
         return base64.b64encode(self.dump()).decode()
 
     def set_key_ids(self, key_ids: list[Union[UUID, str, bytes]]) -> None:
         if self.system_id != PSSH.SystemId.Widevine:
-                                                                             
             raise ValueError(f"Only Widevine PSSH Boxes are supported, not {self.system_id}.")
-
         key_id_uuids = self.parse_key_ids(key_ids)
-
-        if self.version == 1 or self.__key_ids:                                                        
+        if self.version == 1 or self.__key_ids:
             self.__key_ids = key_id_uuids
         cenc_header = WidevinePsshData()
         cenc_header.ParseFromString(self.init_data)
-
-        cenc_header.key_ids[:] = [
-            key_id.bytes
-            for key_id in key_id_uuids
-        ]
+        cenc_header.key_ids[:] = [key_id.bytes for key_id in key_id_uuids]
         self.init_data = cenc_header.SerializeToString()
 
     @staticmethod
     def parse_key_ids(key_ids: list[Union[UUID, str, bytes]]) -> list[UUID]:
         if not isinstance(key_ids, list):
             raise TypeError(f"Expected key_ids to be a list, not {key_ids!r}")
-
         if not all(isinstance(x, (UUID, str, bytes)) for x in key_ids):
-            raise TypeError("Some items of key_ids are not a UUID, str, or bytes. Unsure how to continue...")
-
-        uuids = [
-            UUID(bytes=key_id_b)
-            for key_id in key_ids
-            for key_id_b in [
-                key_id.bytes if isinstance(key_id, UUID) else
-                (
-                    bytes.fromhex(key_id) if all(c in string.hexdigits for c in key_id) else
-                    base64.b64decode(key_id)
-                ) if isinstance(key_id, str) else
-                key_id
-            ]
-        ]
+            raise TypeError("Some items of key_ids are not a UUID, str, or bytes.")
+        uuids = []
+        for key_id in key_ids:
+            if isinstance(key_id, UUID):
+                uuids.append(key_id)
+                continue
+            if isinstance(key_id, bytes):
+                raw = key_id
+            elif all(c in string.hexdigits for c in key_id):
+                raw = bytes.fromhex(key_id)
+            else:
+                raw = base64.b64decode(key_id)
+            if len(raw) != 16:
+                raise ValueError(f"Key ID must be exactly 16 bytes, got {len(raw)}")
+            uuids.append(UUID(bytes=raw))
         return uuids
 
 __all__ = ("PSSH",)
 
 def get_binary_path(*names: str) -> Optional[Path]:
-    """Get the path of the first found binary name."""
     for name in names:
         path = shutil.which(name)
         if path:
             return Path(path)
     return None
+
 
 class Cdm:
     uuid = UUID(bytes=b"\xed\xef\x8b\xa9\x79\xd6\x4a\xce\xa3\xc8\x27\xdc\xd5\x1d\x21\xed")
@@ -961,10 +1888,11 @@ class Cdm:
 
         if not isinstance(license_type, str):
             raise InvalidLicenseType(f"Expected license_type to be a {str}, not {license_type!r}")
-        if license_type not in LicenseType.keys():
+        license_types = _license_type_enum()
+        if license_type not in license_types.keys():
             raise InvalidLicenseType(
                 f"Invalid license_type value of '{license_type}'. "
-                f"Available values: {LicenseType.keys()}"
+                f"Available values: {license_types.keys()}"
             )
 
         if self.device_type == DeviceTypes.ANDROID:                                            
@@ -1281,7 +2209,7 @@ def command_info(args: argparse.Namespace) -> int:
     client_info = {entry.name: entry.value for entry in device.client_id.client_info}
     capabilities = {}
     try:
-        capabilities = MessageToDict(device.client_id, preserving_proto_field_name=True).get("client_capabilities", {})
+        capabilities = _message_to_dict(device.client_id).get("client_capabilities", {})
     except Exception:
         capabilities = {}
     result = {
@@ -1325,10 +2253,8 @@ def build_wvd_name(device: Device, data: bytes) -> str:
     if client_info.get("widevine_cdm_version"):
         name += f" {client_info['widevine_cdm_version']}"
     name += f" {crc32(data).to_bytes(4, 'big').hex()}"
-    try:
-        name = unidecode(name.strip().lower().replace(" ", "_"))
-    except UnidecodeError as exc:
-        raise ValueError(f"Failed to sanitize WVD name, {exc}") from exc
+    name = unicodedata.normalize("NFKD", name.strip().lower().replace(" ", "_"))
+    name = name.encode("ascii", "ignore").decode("ascii")
     name = re.sub(r"[^a-zA-Z0-9_.-]+", "_", name).strip("._-")
     return f"{name}_{device.system_id}_l{device.security_level}.wvd"
 
@@ -1376,7 +2302,7 @@ def write_metadata_file(path: Path, device: Device) -> None:
     client_info = {entry.name: entry.value for entry in device.client_id.client_info}
     capabilities = {}
     try:
-        capabilities = MessageToDict(device.client_id, preserving_proto_field_name=True).get("client_capabilities", {})
+        capabilities = _message_to_dict(device.client_id).get("client_capabilities", {})
     except Exception:
         capabilities = {}
     lines = ["wvd:", f"  device_type: {device.type.name}", f"  security_level: {device.security_level}", "client_info:"]
@@ -1459,7 +2385,14 @@ def command_license(args: argparse.Namespace) -> int:
         if args.license_response:
             license_message = read_binary_argument(args.license_response)
         else:
-            response = requests.post(args.server, headers=parse_headers(args.header), data=challenge)
+            headers = {
+                "User-Agent": "Player/1.6.0 (Linux;Android 14) AndroidXMedia3/1.4.1",
+                "Accept-Encoding": "gzip, deflate, br, zstd",
+                "Accept": "*/*",
+                "Connection": "keep-alive"
+            }
+            headers.update(parse_headers(args.header))
+            response = requests.post(args.server, headers=headers, data=challenge)
             response.raise_for_status()
             license_message = response.content
         cdm.parse_license(session_id, license_message)
@@ -1487,64 +2420,110 @@ def command_pssh(args: argparse.Namespace) -> int:
     return 0
 
 
-def add_device_input_arguments(sp: argparse.ArgumentParser) -> None:
-    sp.add_argument("-w", "--wvd", help="Load a complete WVD file. This mode does not require key, client ID, or VMP arguments.")
-    sp.add_argument("-D", "--device-dir", help="Load a directory containing device_private_key, device_client_id_blob, and optional device_vmp_blob.")
-    sp.add_argument("-k", "--key", help="Device private key path, used with --client-id or --device-certificate.")
-    sp.add_argument("-c", "--client-id", help="Device client ID blob path.")
-    sp.add_argument("--device-certificate", dest="client_id", help="Alias for --client-id. Useful when the blob is referred to as a certificate.")
-    sp.add_argument("-vmp", "--vmp", default=False, help="Optional VMP blob path. Omit it when VMP is not needed.")
-    sp.add_argument("-t", "--type", default="ANDROID", help="Device type: ANDROID/android or CHROME/chrome.")
-    sp.add_argument("-l", "--level", type=int, default=3, help="Security level used when loading key/blob inputs. Default: 3.")
+def command_license_cli(args: argparse.Namespace) -> int:
+    args.wvd = args.device_path
+    args.device_dir = None
+    args.key = None
+    args.client_id = None
+    args.vmp = False
+    args.level = 3
+    args.header = []
+    args.service_certificate = None
+    args.challenge_output = None
+    args.license_response = None
+    args.print_challenge = False
+    args.include_non_content = True
+    args.license_type = args.license_type.upper()
+    return command_license(args)
+
+
+def command_test_cli(args: argparse.Namespace) -> int:
+    args.device_path = args.device
+    args.pssh = "AAAAW3Bzc2gAAAAA7e+LqXnWSs6jyCfc1R0h7QAAADsIARIQ62dqu8s0Xpa7z2FmMPGj2hoNd2lkZXZpbmVfdGVzdCIQZmtqM2xqYVNkZmFsa3IzaioCSEQyAA=="
+    args.server = "https://cwip-shaka-proxy.appspot.com/no_auth"
+    args.license_type = "STREAMING"
+    return command_license_cli(args)
+
+
+def command_create_device_cli(args: argparse.Namespace) -> int:
+    args.device_dir = None
+    args.output = args.output
+    args.overwrite = False
+    return command_create_wvd(args)
+
+
+def command_export_device_cli(args: argparse.Namespace) -> int:
+    args.input = args.wvd_path
+    args.output = args.out_dir
+    args.overwrite = False
+    return command_export_wvd(args)
+
+
+def command_migrate_cli(args: argparse.Namespace) -> int:
+    path = Path(args.path)
+    if not path.exists():
+        raise FileNotFoundError(f"Path does not exist: {path}")
+    devices = sorted(path.glob("*.wvd")) if path.is_dir() else [path]
+    migrated = 0
+    for item in devices:
+        try:
+            device = Device.migrate(item.read_bytes())
+            device.dump(item)
+            emit_line(f"Migrated {item.name}")
+            migrated += 1
+        except ValueError as error:
+            emit_line(f"Skipped {item.name}: {error}")
+    emit_line(f"Migrated {migrated}/{len(devices)} devices")
+    return 0
+
+
+def command_serve_cli(args: argparse.Namespace) -> int:
+    raise RuntimeError("The single-file build does not include the remote serve implementation.")
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="pywv", description="Single-file Widevine utility with integrated proto, WVD, blob, key, local CDM, and PSSH support.", epilog="License input modes: use --wvd for WVD-only execution, use --device-dir for exported device folders, or use --key with --client-id/--device-certificate and optional --vmp. The license command now also covers the former quick test workflow by providing default CWIP PSSH and server values.")
-    parser.add_argument("-d", "--debug", action="store_true", help="Enable debug logging.")
+    parser = argparse.ArgumentParser(prog="pywv", description="Python Widevine CDM utility")
     parser.add_argument("-v", "--version", action="store_true", help="Print version information.")
-    sub = parser.add_subparsers(dest="cmd", required=False)
-    sp = sub.add_parser("info", help="Show detailed information about a WVD file, device directory, or key/blob pair.")
-    add_device_input_arguments(sp)
-    sp.set_defaults(func=command_info)
-    sp = sub.add_parser("create-wvd", help="Create a WVD v2 file from a device directory or key/blob files.")
-    sp.add_argument("-D", "--device-dir")
-    sp.add_argument("-k", "--key")
-    sp.add_argument("-c", "--client-id")
-    sp.add_argument("--device-certificate", dest="client_id")
-    sp.add_argument("-vmp", "--vmp", default=False)
-    sp.add_argument("-t", "--type", default="ANDROID", help="Device type: ANDROID/android or CHROME/chrome.")
-    sp.add_argument("-l", "--level", type=int, default=3)
-    sp.add_argument("-o", "--output", default=None)
-    sp.add_argument("--overwrite", action="store_true")
-    sp.set_defaults(func=command_create_wvd)
-    sp = sub.add_parser("export-wvd", help="Export a WVD file into key, blob, and optional VMP files.")
-    sp.add_argument("input", nargs="?")
-    sp.add_argument("-o", "--output", default=None)
-    sp.add_argument("--overwrite", action="store_true")
-    sp.set_defaults(func=command_export_wvd)
-    sp = sub.add_parser("migrate-wvd", help="Migrate a WVD v1 file to WVD v2.")
-    sp.add_argument("input")
-    sp.add_argument("-o", "--output", default=None)
-    sp.add_argument("--overwrite", action="store_true")
-    sp.set_defaults(func=command_migrate_wvd)
-    sp = sub.add_parser("license", help="Create a license challenge and optionally parse a license response. Supports WVD-only and key/blob modes.")
-    sp.add_argument("--pssh", default="AAAAW3Bzc2gAAAAA7e+LqXnWSs6jyCfc1R0h7QAAADsIARIQ62dqu8s0Xpa7z2FmMPGj2hoNd2lkZXZpbmVfdGVzdCIQZmtqM2xqYVNkZmFsa3IzaioCSEQyAA==")
-    sp.add_argument("--server", default="https://cwip-shaka-proxy.appspot.com/no_auth")
-    sp.add_argument("-H", "--header", action="append", default=[])
-    add_device_input_arguments(sp)
-    sp.add_argument("--service-certificate", help="Service privacy certificate used with --privacy.")
-    sp.add_argument("--privacy", action="store_true")
-    sp.add_argument("--license-type", default="STREAMING", choices=LicenseType.keys())
-    sp.add_argument("--challenge-output")
-    sp.add_argument("--license-response")
-    sp.add_argument("--print-challenge", action="store_true")
-    sp.add_argument("--include-non-content", action="store_true")
-    sp.set_defaults(func=command_license)
-    sp = sub.add_parser("pssh", help="Inspect or rewrite PSSH data.")
-    sp.add_argument("input")
-    sp.add_argument("-o", "--output", default="base64", choices=["base64", "hex", "json", "raw"])
-    sp.add_argument("--set-key-id", action="append")
-    sp.set_defaults(func=command_pssh)
+    parser.add_argument("-d", "--debug", action="store_true", help="Enable DEBUG level logs.")
+    sub = parser.add_subparsers(dest="cmd")
+
+    license_cmd = sub.add_parser("license", help="Make a license request")
+    license_cmd.add_argument("device_path")
+    license_cmd.add_argument("pssh")
+    license_cmd.add_argument("server")
+    license_cmd.add_argument("-t", "--type", dest="license_type", default="STREAMING", choices=_license_type_enum().keys(), help="License Type to Request.")
+    license_cmd.add_argument("-p", "--privacy", action="store_true", help="Use Privacy Mode, off by default.")
+    license_cmd.set_defaults(func=command_license_cli)
+
+    test_cmd = sub.add_parser("test", help="Test the CDM with the default CWIP sample")
+    test_cmd.add_argument("device")
+    test_cmd.add_argument("-p", "--privacy", action="store_true", help="Use Privacy Mode, off by default.")
+    test_cmd.set_defaults(func=command_test_cli)
+
+    create = sub.add_parser("create-device", help="Create a Widevine Device (.wvd) file")
+    create.add_argument("-t", "--type", required=True, choices=["ANDROID", "CHROME", "android", "chrome"], help="Device Type")
+    create.add_argument("-l", "--level", type=int, required=True, choices=[1, 2, 3], help="Device Security Level")
+    create.add_argument("-k", "--key", required=True, help="Device RSA Private Key in PEM or DER format")
+    create.add_argument("-c", "--client_id", dest="client_id", required=True, help="Widevine ClientIdentification Blob file")
+    create.add_argument("-v", "--vmp", default=None, help="Widevine FileHashes Blob file")
+    create.add_argument("-o", "--output", default=None, help="Output Path or Directory")
+    create.set_defaults(func=command_create_device_cli)
+
+    export = sub.add_parser("export-device", help="Export a Widevine Device (.wvd) file")
+    export.add_argument("wvd_path")
+    export.add_argument("-o", "--out_dir", dest="out_dir", default=None, help="Output Directory")
+    export.set_defaults(func=command_export_device_cli)
+
+    migrate = sub.add_parser("migrate", help="Upgrade earlier WVD formats")
+    migrate.add_argument("path")
+    migrate.set_defaults(func=command_migrate_cli)
+
+    serve = sub.add_parser("serve", help="Serve local CDM and Widevine Devices remotely", add_help=False)
+    serve.add_argument("config_path")
+    serve.add_argument("-h", "--host", default="127.0.0.1", help="Host to serve from.")
+    serve.add_argument("-p", "--port", type=int, default=8786, help="Port to serve from.")
+    serve.set_defaults(func=command_serve_cli)
+
     return parser
 
 __all__ = ("PSSH", "Device", "DeviceTypes", "Cdm", "Key", "Session", "ClientIdentification", "DrmCertificate", "SignedDrmCertificate", "SignedMessage", "License", "LicenseRequest", "WidevinePsshData", "FileHashes", "EncryptedClientIdentification", "Exception", "TooManySessions", "InvalidSession", "InvalidInitData", "InvalidLicenseType", "InvalidLicenseMessage", "InvalidContext", "SignatureMismatch", "NoKeysLoaded")
